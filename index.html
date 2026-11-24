@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <title>Punto 3 M - Gestor de Mi Negocio</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- Evita el parpadeo blanco: aplica el modo oscuro antes de dibujar -->
+    <script>
+        try {
+            var g = localStorage.getItem('modoOscuro');
+            if (g === '1' || (g === null && matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        } catch (e) {}
+    </script>
+
+    <!-- Tailwind por CDN: sirve para desarrollar y funciona sin compilar nada.
+         Para producción compila el CSS (ver README, sección "Tailwind compilado"):
+         comenta estas dos líneas <script> y descomenta el <link> de abajo. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    
+
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Firebase (SDK compat por CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
+
+    <!-- Pantalla de carga -->
+    <div id="pantalla-carga" class="fixed inset-0 z-[60] bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center gap-3 p-6 text-center no-print">
+        <div class="text-4xl">🚀</div>
+        <p id="carga-texto" class="text-sm text-slate-500 dark:text-slate-400 max-w-sm">Cargando…</p>
+        <button type="button" id="carga-salir" data-action="cerrar-sesion" class="hidden bg-slate-700 text-white text-xs px-4 py-2 rounded-lg font-bold">Cerrar sesión</button>
+    </div>
+
+    <!-- Inicio de sesión -->
+    <div id="pantalla-login" class="fixed inset-0 z-[55] bg-slate-100 dark:bg-slate-900 hidden items-center justify-center p-4 no-print">
+        <form id="form-login" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div class="text-center">
+                <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Punto 3 M 🚀</h1>
+                <p class="text-xs text-slate-500">Inicia sesión para continuar</p>
+            </div>
+            <input type="email" id="login-email" autocomplete="username" required placeholder="Correo" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-sm">
+            <input type="password" id="login-password" autocomplete="current-password" required placeholder="Contraseña" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-sm">
+            <p id="login-error" class="hidden text-xs text-red-600 font-semibold"></p>
+            <button type="submit" id="btn-login" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm">Entrar</button>
+        </form>
+    </div>
+
+    <!-- Encabezado -->
+    <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
+            <div>
+                <h1 class="text-2xl font-bold">Punto 3 M 🚀</h1>
+                <p class="text-xs text-indigo-200"><span id="badge-usuario">Sin sesión</span> · <span id="badge-conexion">🟢 En línea</span></p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <span id="badge-rol" class="text-xs bg-indigo-500 dark:bg-indigo-700 px-3 py-1 rounded-full font-medium">Cajero: Ninguno</span>
+                <button type="button" id="btn-dark-mode" data-action="modo-oscuro" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-2.5 py-1.5 rounded-lg font-semibold" aria-label="Cambiar modo oscuro">🌙</button>
+                <button type="button" data-action="abrir-cajeros" class="bg-blue-600 hover:bg-blue-700 text-xs px-3 py-1.5 rounded-lg font-semibold shadow">👥 Cajero</button>
+                <button type="button" id="btn-cambiar-modo" data-action="acceso-dueno" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-1.5 rounded-lg font-semibold">🔒 Dueño</button>
+                <button type="button" data-action="cerrar-sesion" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-1.5 rounded-lg font-semibold">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tasas y cajero activo -->
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/50 py-2 px-4 text-xs text-amber-800 dark:text-amber-300 font-medium no-print">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <span>💱 Tasa del día: <strong>USD: <span id="lbl-tasa-usd">320</span> CUP</strong> | <strong>MLC: <span id="lbl-tasa-mlc">280</span> CUP</strong></span>
+            <span id="barra-estado-cajero-activo" class="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 px-2.5 py-0.5 rounded-full font-bold">⚪ Cajero: Ninguno</span>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6 no-print">
+
+        <!-- VISTA DE VENTA -->
+        <div id="vista-pos" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <section class="lg:col-span-2 space-y-6">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                        <h2 class="text-xl font-semibold text-indigo-600 dark:text-indigo-400">Registrar Venta</h2>
+                        <button type="button" data-action="abrir-arqueo" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">💵 Arqueo de Caja</button>
+                    </div>
+                    <div class="flex flex-wrap gap-1 text-xs mb-4" id="botones-categorias"></div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                        <div class="relative">
+                            <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-lg border border-indigo-200 dark:border-indigo-900 flex items-center gap-2">
+                                <span class="text-sm">🔍</span>
+                                <input type="text" id="input-buscador-predictivo" placeholder="Buscar producto..." class="flex-1 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-1.5 text-xs font-medium" autocomplete="off">
+                            </div>
+                            <div id="lista-sugerencias" class="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-xl z-30 hidden max-h-48 overflow-y-auto"></div>
+                        </div>
+                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-lg border border-indigo-200 dark:border-indigo-900 flex items-center gap-2">
+                            <span class="text-sm">📷</span>
+                            <input type="text" id="input-codigo-barras" placeholder="Escanear código de barras..." class="flex-1 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-1.5 text-xs font-medium" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-2" id="product-grid"></div>
+                </div>
+            </section>
+
+            <!-- Carrito -->
+            <section class="space-y-6">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 flex flex-col justify-between h-fit border-2 border-indigo-200 dark:border-indigo-900">
+                    <div>
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-lg text-indigo-600 dark:text-indigo-400">🛒 Carrito Actual</h3>
+                            <button type="button" data-action="vaciar-carrito" class="text-xs text-red-500 hover:underline">Limpiar</button>
+                        </div>
+                        <div class="border dark:border-slate-700 rounded-lg p-3 mb-4 bg-slate-50 dark:bg-slate-900/50 min-h-[140px] max-h-60 overflow-y-auto" id="lista-carrito">
+                            <p class="text-slate-400 text-sm italic">Carrito vacío.</p>
+                        </div>
+                        <div class="bg-indigo-50 dark:bg-indigo-950/50 p-4 rounded-lg mb-4 flex justify-between items-center border border-indigo-100 dark:border-indigo-900">
+                            <div>
+                                <p class="text-xs text-indigo-600 dark:text-indigo-300 font-medium">Total USD:</p>
+                                <p class="text-xl font-extrabold text-indigo-900 dark:text-indigo-100" id="total-usd">$0.00</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Equivalente CUP:</p>
+                                <p class="text-xl font-extrabold text-emerald-900 dark:text-emerald-200" id="total-cup">0 CUP</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" data-action="cobrar" data-moneda="USD" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow text-xs">USD 💵</button>
+                        <button type="button" data-action="cobrar" data-moneda="MLC" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow text-xs">MLC 💳</button>
+                        <button type="button" data-action="cobrar" data-moneda="CUP" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow text-xs">CUP 🧮</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- PANEL DE ADMINISTRACIÓN (solo dueño) -->
+        <div id="panel-gestion-dueno" class="space-y-6 hidden">
+
+            <div class="bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 p-4 rounded-xl flex flex-wrap justify-between items-center gap-3">
+                <div>
+                    <h3 class="font-bold text-amber-900 dark:text-amber-200 text-sm">🛠️ Panel de Administración</h3>
+                    <p class="text-xs text-amber-700 dark:text-amber-400">Inventario, turnos, cierres y respaldos. Los datos se sincronizan en tiempo real con la nube.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" data-action="importar-antiguo" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">⬆️ Importar datos anteriores</button>
+                    <button type="button" data-action="exportar-respaldo" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">💾 Exportar Respaldo</button>
+                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow cursor-pointer">
+                        📂 Restaurar Datos
+                        <input type="file" id="input-importar" accept=".json,application/json" class="hidden">
+                    </label>
+                    <button type="button" data-action="cerrar-modo-dueno" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">🔒 Cerrar Modo Dueño</button>
+                </div>
+            </div>
+
+            <!-- Stock crítico -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-red-300 dark:border-red-900">
+                <h2 class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">🚨 Alertas de Stock Bajo (&lt; 5 unidades)</h2>
+                <div id="contenedor-stock-critico" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+            </div>
+
+            <!-- Categorías -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-3">📁 Gestión de Categorías</h2>
+                <div class="flex flex-wrap gap-2 items-center mb-4">
+                    <input type="text" id="input-nueva-categoria" placeholder="Nombre de nueva categoría..." class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
+                    <button type="button" data-action="agregar-categoria" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold shadow">+ Añadir Categoría</button>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center" id="contenedor-chips-categorias"></div>
+            </div>
+
+            <!-- Personal -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <div>
+                        <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">👥 Control de Asistencia y Turnos</h2>
+                        <p class="text-xs text-slate-500">Cronómetro en vivo del tiempo transcurrido de cada trabajador en turno. Cada cajero entra con su PIN.</p>
+                    </div>
+                    <button type="button" data-action="nuevo-empleado" class="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold">+ Añadir Trabajador</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
+                            <tr>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3">Trabajador</th>
+                                <th class="p-3">Tiempo en turno</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-empleados-admin" class="divide-y dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Inventario -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📦 Inventario y Stock (Inicial vs. Actual)</h2>
+                    <div class="flex space-x-2">
+                        <button type="button" data-action="abrir-tasa" class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-2 rounded-lg font-medium">⚙️ Tasa Cambio</button>
+                        <button type="button" data-action="nuevo-producto" class="bg-emerald-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-emerald-700 font-medium">+ Producto</button>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <input type="text" id="input-buscador-inventario" placeholder="🔍 Filtrar por nombre, categoría o código..." class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-b dark:border-slate-700">
+                            <tr>
+                                <th class="p-3">Producto</th>
+                                <th class="p-3">Cat.</th>
+                                <th class="p-3">Costo / Precio</th>
+                                <th class="p-3">Ini. / Actual</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-inventario" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mermas -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📉 Control de Mermas</h2>
+                    <button type="button" data-action="abrir-merma" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold">+ Registrar Merma</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
+                            <tr><th class="p-3">Hora</th><th class="p-3">Producto</th><th class="p-3">Cantidad</th><th class="p-3">Motivo</th><th class="p-3">Pérdida</th></tr>
+                        </thead>
+                        <tbody id="tabla-mermas" class="divide-y dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Historial -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📋 Historial de Tickets (turno actual)</h2>
+                    <div class="flex items-center space-x-2">
+                        <select id="filtro-historial-cajero" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-1 text-xs">
+                            <option value="TODOS">Todos los cajeros</option>
+                        </select>
+                        <span class="text-xs bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-medium" id="contador-tickets">0 tickets</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700 sticky top-0">
+                            <tr><th class="p-3">Hora</th><th class="p-3">Cajero</th><th class="p-3">Detalle</th><th class="p-3">Cobrado</th><th class="p-3">Total</th><th class="p-3 text-right">Recibo</th></tr>
+                        </thead>
+                        <tbody id="tabla-historial" class="divide-y dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Panel financiero -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900 space-y-5">
+                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📊 Panel Financiero y Cuadre de Cierre</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-indigo-50 dark:bg-indigo-950/40 p-4 rounded-xl border dark:border-slate-700">
+                        <p class="text-xs text-indigo-600 font-medium">Ventas Totales</p>
+                        <p class="text-2xl font-extrabold mt-1" id="ventas-dia">$0.00 USD</p>
+                    </div>
+                    <div class="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl border dark:border-slate-700">
+                        <p class="text-xs text-amber-600 font-medium">Gastos / Mermas</p>
+                        <p class="text-2xl font-extrabold mt-1" id="gastos-dia">$0.00 USD</p>
+                    </div>
+                    <div class="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-xl border dark:border-slate-700">
+                        <p class="text-xs text-emerald-600 font-medium">Ganancia Neta</p>
+                        <p class="text-2xl font-extrabold mt-1" id="ganancia-neta-dia">$0.00 USD</p>
+                    </div>
+                </div>
+
+                <div class="border-t dark:border-slate-700 pt-4">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">📂 Ingresos por Categoría (CUP / USD)</h3>
+                    <div id="desglose-categorias-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button type="button" data-action="abrir-reporte-z" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs shadow">📊 Generar Reporte Z / Cerrar Turno</button>
+                </div>
+            </div>
+
+            <!-- Cierres anteriores -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-4">🗂️ Turnos Cerrados (últimos 30)</h2>
+                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700 sticky top-0">
+                            <tr><th class="p-3">Cierre</th><th class="p-3">Tickets</th><th class="p-3">Ventas</th><th class="p-3">Neto</th><th class="p-3">Cerrado por</th></tr>
+                        </thead>
+                        <tbody id="tabla-cierres" class="divide-y dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===================== MODALES ===================== -->
+
+    <!-- Merma -->
+    <div id="modal-merma" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold">📉 Registrar Merma</h3>
+            <select id="merma-producto-select" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-sm"></select>
+            <input type="number" min="1" value="1" id="merma-cantidad" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-sm">
+            <select id="merma-motivo" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-sm">
+                <option value="Roto / Dañado">Roto / Dañado</option>
+                <option value="Vencido">Vencido</option>
+                <option value="Consumo Interno">Consumo Interno</option>
+            </select>
+            <div class="flex space-x-3 pt-2">
+                <button type="button" data-action="cerrar-modal" data-modal="modal-merma" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cancelar</button>
+                <button type="button" data-action="guardar-merma" class="w-1/2 bg-red-600 text-white py-2 rounded text-xs font-bold">Registrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Arqueo de caja -->
+    <div id="modal-arqueo" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold no-print">💵 Arqueo de Caja (CUP)</h3>
+            <p class="text-xs text-slate-500 no-print">Cuenta los billetes que hay en la gaveta y compáralos con lo que debería haber según las ventas en CUP.</p>
+
+            <div id="area-impresion-arqueo" class="zona-impresion overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700">
+                        <tr>
+                            <th class="p-2">Billete</th>
+                            <th class="p-2 text-center">Contados</th>
+                            <th class="p-2 text-right">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-arqueo-denominaciones" class="divide-y dark:divide-slate-700"></tbody>
+                </table>
+                <div class="mt-3 space-y-1 text-sm">
+                    <div class="flex justify-between"><span>Esperado en caja:</span><strong id="arqueo-esperado">0 CUP</strong></div>
+                    <div class="flex justify-between"><span>Total contado:</span><strong id="arqueo-total-contado">0 CUP</strong></div>
+                    <div class="flex justify-between"><span>Diferencia:</span><span id="arqueo-diferencia" class="font-extrabold">Cuadra ✅</span></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-2 no-print">
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2 rounded text-xs font-bold">🖨️ Imprimir Arqueo</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-arqueo" class="bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporte Z -->
+    <div id="modal-reportez" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-base font-bold text-center no-print">📊 Cierre de Caja y Stock (Reporte Z)</h3>
+            <div id="area-impresion-reportez" class="zona-impresion recibo">
+                <div class="centro negrita" style="font-size:12px;">PUNTO 3 M - REPORTE Z</div>
+                <div class="centro" id="rz-fecha"></div>
+                <div class="linea"></div>
+                <div class="negrita">EFECTIVO EN CAJA:</div>
+                <div class="fila"><span>USD:</span><span id="rz-usd"></span></div>
+                <div class="fila"><span>MLC:</span><span id="rz-mlc"></span></div>
+                <div class="fila"><span>CUP:</span><span id="rz-cup"></span></div>
+                <div class="linea"></div>
+                <div class="fila"><span>Tickets:</span><span id="rz-tickets"></span></div>
+                <div class="fila"><span>Ventas totales:</span><span id="rz-ventas"></span></div>
+                <div class="fila"><span>Mermas/Gastos:</span><span id="rz-gastos"></span></div>
+                <div class="fila negrita"><span>GANANCIA NETA:</span><span id="rz-neto"></span></div>
+                <div class="linea"></div>
+                <div class="negrita">CUADRE INVENTARIO (Ini->Fin):</div>
+                <div id="rz-cuadre-inventario" style="margin-top:4px;"></div>
+                <div class="linea"></div>
+                <div class="centro">Fin de Turno</div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 no-print">
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2 rounded text-xs font-bold">🖨️ Imprimir Z</button>
+                <button type="button" data-action="reiniciar-turno" class="bg-red-600 text-white py-2 rounded text-xs font-bold">🔄 Cerrar Turno</button>
+            </div>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-reportez" class="w-full bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs no-print">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Selección de cajero -->
+    <div id="modal-seleccion-cajero" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold">👥 Seleccionar Cajero Activo</h3>
+            <div id="lista-modal-cajeros" class="space-y-2 max-h-48 overflow-y-auto"></div>
+            <button type="button" id="btn-quitar-cajero" data-action="quitar-cajero" class="hidden w-full bg-amber-100 text-amber-900 py-2 rounded text-xs font-bold">Salir de mi turno de caja</button>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-seleccion-cajero" class="w-full bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Cobro -->
+    <div id="modal-cobro" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold">Cobrar en <span id="cobro-moneda-titulo" class="text-indigo-600">CUP</span></h3>
+            <div class="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border dark:border-slate-700 text-center">
+                <p class="text-xs text-slate-500">Total a pagar:</p>
+                <p class="text-2xl font-extrabold" id="cobro-total-pagar">0 CUP</p>
+            </div>
+            <input type="number" step="0.01" min="0" id="input-efectivo-recibido" class="w-full border-2 border-indigo-300 dark:border-indigo-800 dark:bg-slate-900 rounded-lg p-3 text-xl font-bold text-center" placeholder="Pago exacto" inputmode="decimal">
+            <p id="cobro-error" class="hidden text-xs text-red-600 font-bold text-center"></p>
+            <div class="bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-lg border dark:border-slate-700 text-center">
+                <p class="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Vuelto / Cambio:</p>
+                <p class="text-xl font-extrabold text-emerald-800 dark:text-emerald-200" id="cobro-vuelto-texto">0.00</p>
+            </div>
+            <div class="flex space-x-3 pt-2">
+                <button type="button" data-action="cerrar-modal" data-modal="modal-cobro" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-3 rounded-xl font-medium text-sm">Cancelar</button>
+                <button type="button" data-action="confirmar-venta" class="w-1/2 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow">Cobrar ✅</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ticket -->
+    <div id="modal-ticket" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-xs w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div id="area-impresion-ticket" class="zona-impresion recibo">
+                <div class="centro negrita" style="font-size:12px;">PUNTO 3 M</div>
+                <div class="centro">Gestor de Negocio</div>
+                <div class="centro" id="ticket-cajero"></div>
+                <div class="centro" id="ticket-fecha-hora"></div>
+                <div class="linea"></div>
+                <div id="ticket-lista-items"></div>
+                <div class="linea"></div>
+                <div class="fila negrita"><span>TOTAL:</span><span id="ticket-total"></span></div>
+                <div class="fila"><span>Recibido:</span><span id="ticket-recibido"></span></div>
+                <div class="fila negrita"><span>Vuelto:</span><span id="ticket-vuelto"></span></div>
+                <div class="linea"></div>
+                <div class="centro">¡Gracias por su compra!</div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-4 no-print">
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2 rounded text-xs font-bold">🖨️ Imprimir</button>
+                <button type="button" data-action="copiar-ticket" class="bg-emerald-600 text-white py-2 rounded text-xs font-bold">📋 Copiar</button>
+            </div>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-ticket" class="w-full mt-2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs no-print">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Tasa de cambio -->
+    <div id="modal-tasa" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
+            <h3 class="text-lg font-bold">⚙️ Actualizar Tasa de Cambio</h3>
+            <div>
+                <label for="input-tasa-usd" class="text-xs font-bold text-indigo-600 dark:text-indigo-400">Tasa USD (en CUP):</label>
+                <input type="number" step="0.01" min="0" id="input-tasa-usd" class="w-full border dark:border-slate-700 rounded p-2 text-sm mt-1 dark:bg-slate-900">
+            </div>
+            <div>
+                <label for="input-tasa-mlc" class="text-xs font-bold text-blue-600 dark:text-blue-400">Tasa MLC (en CUP):</label>
+                <input type="number" step="0.01" min="0" id="input-tasa-mlc" class="w-full border dark:border-slate-700 rounded p-2 text-sm mt-1 dark:bg-slate-900">
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button type="button" data-action="cerrar-modal" data-modal="modal-tasa" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cancelar</button>
+                <button type="button" data-action="guardar-tasa" class="w-1/2 bg-indigo-600 text-white py-2 rounded text-xs font-bold">Guardar Tasas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Producto (nuevo / editar) -->
+    <div id="modal-producto" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-6 space-y-3 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold" id="producto-modal-titulo">📦 Nuevo Producto</h3>
+            <input type="hidden" id="nuevo-id">
+            <input type="text" id="nuevo-nombre" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Nombre del producto">
+            <input type="text" id="nuevo-codigo" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Código de barras (opcional)">
+            <select id="nuevo-categoria" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900"></select>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label for="nuevo-moneda-base" class="text-[10px] text-slate-500">Moneda del precio:</label>
+                    <select id="nuevo-moneda-base" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900">
+                        <option value="USD">USD ($)</option>
+                        <option value="CUP">CUP (pesos)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="input-precio-base" class="text-[10px] text-slate-500">Precio:</label>
+                    <input type="number" step="0.01" min="0" id="input-precio-base" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Precio" inputmode="decimal">
+                </div>
+            </div>
+            <input type="number" step="0.01" min="0" id="nuevo-costo" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Costo en USD" inputmode="decimal">
+            <div id="grupo-stock-inicial">
+                <input type="number" min="0" id="nuevo-stock" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Stock inicial" inputmode="numeric">
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button type="button" data-action="cerrar-modal" data-modal="modal-producto" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs font-semibold">Cancelar</button>
+                <button type="button" data-action="guardar-producto" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-xs font-bold">Guardar Producto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trabajador (nuevo / cambiar PIN) -->
+    <div id="modal-empleado" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-3 shadow-2xl">
+            <h3 class="text-lg font-bold" id="empleado-modal-titulo">👤 Nuevo Trabajador</h3>
+            <input type="hidden" id="empleado-id">
+            <input type="text" id="empleado-nombre" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900 disabled:opacity-60" placeholder="Nombre">
+            <input type="password" id="empleado-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="PIN (4 a 8 dígitos)">
+            <p id="empleado-error" class="hidden text-xs text-red-600 font-semibold"></p>
+            <div class="flex space-x-2 pt-2">
+                <button type="button" data-action="cerrar-modal" data-modal="modal-empleado" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs font-semibold">Cancelar</button>
+                <button type="button" data-action="guardar-empleado" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-xs font-bold">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diálogo genérico (reemplaza alert / confirm / prompt) -->
+    <div id="modal-dialogo" class="modal-overlay fixed inset-0 bg-black/60 hidden items-center justify-center p-4 z-[70] no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <h3 id="dialogo-titulo" class="text-lg font-bold"></h3>
+            <p id="dialogo-texto" class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line"></p>
+            <input type="text" id="dialogo-input" class="hidden w-full border-2 border-indigo-300 dark:border-indigo-800 dark:bg-slate-900 rounded-lg p-3 text-lg font-bold text-center">
+            <div class="flex space-x-3">
+                <button type="button" id="dialogo-cancelar" data-action="dialogo-cancelar" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded-lg text-sm">Cancelar</button>
+                <button type="button" id="dialogo-ok" data-action="dialogo-ok" class="w-1/2 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avisos -->
+    <div id="toasts" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[80] space-y-2 pointer-events-none no-print"></div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+/* Estilos propios. Lo demás lo pone Tailwind. */
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Recibo de 58 mm (ticket, arqueo y reporte Z) */
+.recibo {
+  width: 58mm;
+  margin: 0 auto;
+  padding: 6px;
+  background: #fff;
+  color: #000;
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.3;
+  border: 1px dashed #ccc;
+}
+.recibo .centro { text-align: center; }
+.recibo .negrita { font-weight: bold; }
+.recibo .fila { display: flex; justify-content: space-between; gap: 6px; }
+.recibo .linea { border-top: 1px dashed #000; margin: 3px 0; }
+
+@media print {
+  @page { margin: 0; }
+
+  body * { visibility: hidden !important; }
+
+  .zona-impresion,
+  .zona-impresion * { visibility: visible !important; }
+
+  .zona-impresion {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm;
+    border: 0;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* El modal deja de ser una capa flotante para que no recorte la impresión */
+  .modal-overlay:not(.hidden) {
+    position: static !important;
+    background: none !important;
+    display: block !important;
+  }
+  .modal-caja {
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  .no-print { display: none !important; }
+}
