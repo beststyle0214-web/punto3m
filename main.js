@@ -14,9 +14,15 @@ import {
 } from './pos.js';
 import {
   renderAdmin, accionesAdmin, actualizarCronometros, renderInventario, renderHistorial, importarRespaldo,
+  cargarFoto, cambioFormularioProducto,
 } from './admin.js';
+import { accionesCuenta, guardarPromptInstalacion, appInstalada, renderCuenta } from './cuenta.js';
+import { manejarEvento } from './avisos.js';
+import { cerrarEscaner } from './escaner.js';
 
 // ------------------------------------------------------------- pantalla de carga
+
+let esperaLenta = null;
 
 function setCarga(texto, conSalida = false) {
   $('carga-texto').textContent = texto;
@@ -33,6 +39,19 @@ function falloEscucha(e) {
       : 'No se pudieron cargar los datos. Revisa tu conexión e inténtalo de nuevo.',
     true,
   );
+}
+
+/** Si cargar tarda mucho (internet lento), explica qué pasa en vez de dejar la pantalla muda. */
+function vigilarCarga() {
+  clearTimeout(esperaLenta);
+  esperaLenta = setTimeout(() => {
+    const c = estado.cargado;
+    if (c.config && c.productos && c.empleados && c.turno) return;
+    setCarga(
+      'La conexión está muy lenta o no hay internet. Si ya usaste la app en este teléfono, los datos guardados deberían aparecer en unos segundos; si es la primera vez, hace falta conexión (en Cuba, quizás VPN) solo para esta primera carga.',
+      true,
+    );
+  }, 15000);
 }
 
 // ------------------------------------------------------------- dibujo
@@ -53,7 +72,10 @@ function renderCabecera() {
   $('badge-usuario').textContent = estado.user ? `${estado.user.email}${estado.esDueno ? ' 👑' : ''}` : 'Sin sesión';
   $('btn-cambiar-modo').textContent = estado.modoDueno ? '🔓 Salir del panel' : '🔒 Dueño';
   $('btn-dark-mode').textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-  $('badge-conexion').textContent = navigator.onLine ? '🟢 En línea' : '🔴 Sin conexión';
+  $('badge-conexion').textContent = navigator.onLine ? '🟢 En línea' : '🔴 Sin conexión (se guarda en el teléfono)';
+  const p = estado.pendientes;
+  $('badge-pendientes').textContent = p > 0 ? `⏳ ${p} venta(s) por sincronizar` : '';
+  $('badge-pendientes').classList.toggle('hidden', p <= 0);
 }
 
 function actualizarVisibilidad() {
@@ -65,6 +87,7 @@ function renderTodo() {
   renderCabecera();
   const c = estado.cargado;
   if (!(c.config && c.productos && c.empleados && c.turno)) return;
+  clearTimeout(esperaLenta);
 
   if (!estado.configExiste || !estado.turno) {
     if (estado.esDueno) {
@@ -85,6 +108,7 @@ function renderTodo() {
   cerrarModal('pantalla-carga');
   actualizarVisibilidad();
   renderPOS();
+  renderCuenta();
   if (estado.modoDueno) renderAdmin();
 }
 
@@ -141,6 +165,7 @@ function salirModoDueno() {
 
 observarSesion(async (user) => {
   if (!user) {
+    clearTimeout(esperaLenta);
     datos.detenerEscuchas();
     reiniciarEstado();
     sembrando = false;
@@ -151,6 +176,7 @@ observarSesion(async (user) => {
   }
   cerrarModal('pantalla-login');
   setCarga('Cargando datos…');
+  vigilarCarga();
   estado.user = user;
   estado.esDueno = await esCuentaDueno(user);
   estado.cajeroId = sessionStorage.getItem('cajeroId');
@@ -163,6 +189,7 @@ $('form-login').addEventListener('submit', async (e) => {
   const boton = $('btn-login');
   const error = $('login-error');
   error.classList.add('hidden');
+  $('login-info').classList.add('hidden');
   boton.disabled = true;
   boton.textContent = 'Entrando…';
   try {
@@ -182,7 +209,9 @@ $('form-login').addEventListener('submit', async (e) => {
 const acciones = {
   ...accionesPOS,
   ...accionesAdmin,
+  ...accionesCuenta,
   'cerrar-modal': (d) => cerrarModal(d.modal),
+  'cerrar-escaner': cerrarEscaner,
   imprimir: () => window.print(),
   'modo-oscuro': alternarModoOscuro,
   'cerrar-sesion': salir,
@@ -203,6 +232,11 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.dataset && e.target.dataset.input === 'arqueo') calcularTotalArqueo();
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'nuevo-categoria' || e.target.id === 'nuevo-subcategoria') cambioFormularioProducto(e);
+  if (e.target.id === 'input-foto-camara' || e.target.id === 'input-foto-galeria') cargarFoto(e);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -227,7 +261,15 @@ $('input-importar').addEventListener('change', importarRespaldo);
 
 window.addEventListener('online', renderCabecera);
 window.addEventListener('offline', renderCabecera);
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  guardarPromptInstalacion(e);
+});
+window.addEventListener('appinstalled', appInstalada);
 setInterval(actualizarCronometros, 1000);
+
+// Avisos del teléfono (ventas, stock, productos nuevos) para la cuenta del dueño.
+datos.alEvento(manejarEvento);
 
 // ------------------------------------------------------------- arranque
 

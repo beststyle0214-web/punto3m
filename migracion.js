@@ -2,7 +2,7 @@
 // o un archivo de respaldo .json) al modelo nuevo (una colección por tipo, dinero en enteros).
 // Devuelve un "plan" { config, productos, empleados } que data.js aplica a Firestore.
 
-import { aMillis } from './utils.js';
+import { aMillis, fotoValida } from './utils.js';
 
 const entero = (v, def = 0) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : def);
 
@@ -36,20 +36,30 @@ export function empleadoDesdeAntiguo(e) {
 }
 
 function productoNuevo(p) {
-  return {
-    id: String(p.id),
-    datos: {
-      codigo: String(p.codigo || ''),
-      nombre: String(p.nombre || 'Sin nombre'),
-      categoria: String(p.categoria || 'Varios'),
-      moneda: p.moneda === 'CUP' ? 'CUP' : 'USD',
-      precio: entero(p.precio),
-      costoCents: entero(p.costoCents),
-      stockInicial: entero(p.stockInicial, entero(p.stock)),
-      stock: entero(p.stock),
-    },
+  const costoMoneda = p.costoMoneda === 'CUP' ? 'CUP' : 'USD';
+  const costo = p.costo !== undefined && p.costo !== null ? entero(p.costo) : entero(p.costoCents);
+  const datos = {
+    codigo: String(p.codigo || ''),
+    nombre: String(p.nombre || 'Sin nombre'),
+    variante: String(p.variante || ''),
+    categoria: String(p.categoria || 'Varios'),
+    subcategoria: String(p.subcategoria || ''),
+    moneda: p.moneda === 'CUP' ? 'CUP' : 'USD',
+    precio: entero(p.precio),
+    costo,
+    costoMoneda,
+    costoCents: costoMoneda === 'USD' ? costo : 0,
+    stockInicial: entero(p.stockInicial, entero(p.stock)),
+    stock: entero(p.stock),
   };
+  if (fotoValida(p.foto)) datos.foto = p.foto;
+  return { id: String(p.id), datos };
 }
+
+const subcategoriasDe = (lista) =>
+  (Array.isArray(lista) ? lista : [])
+    .filter((s) => s && s.cat && s.nombre)
+    .map((s) => ({ cat: String(s.cat), nombre: String(s.nombre) }));
 
 /** Plan a partir del documento de la versión anterior o de su respaldo .json. */
 export function planDesdeAntiguo(d) {
@@ -58,6 +68,7 @@ export function planDesdeAntiguo(d) {
       tasaUSD: Number(d.tasaUSD) > 0 ? Number(d.tasaUSD) : null,
       tasaMLC: Number(d.tasaMLC) > 0 ? Number(d.tasaMLC) : null,
       categorias: Array.isArray(d.categorias) ? d.categorias.map(String) : [],
+      subcategorias: [],
     },
     productos: (Array.isArray(d.inventario) ? d.inventario : []).map(productoDesdeAntiguo),
     empleados: (Array.isArray(d.listaEmpleados) ? d.listaEmpleados : []).map(empleadoDesdeAntiguo),
@@ -72,6 +83,7 @@ export function planDesdeRespaldoNuevo(d) {
       tasaUSD: Number(c.tasaUSD) > 0 ? Number(c.tasaUSD) : null,
       tasaMLC: Number(c.tasaMLC) > 0 ? Number(c.tasaMLC) : null,
       categorias: Array.isArray(c.categorias) ? c.categorias.map(String) : [],
+      subcategorias: subcategoriasDe(c.subcategorias),
     },
     productos: (Array.isArray(d.productos) ? d.productos : []).map(productoNuevo),
     empleados: (Array.isArray(d.empleados) ? d.empleados : []).map((e) => ({

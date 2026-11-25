@@ -1,12 +1,14 @@
 // Capa de datos: escuchas en tiempo real y escrituras a Firestore.
 //
 // Modelo (una colección por tipo, en vez de un solo documento gigante):
-//   config/general   { tasaUSD, tasaMLC, categorias[] }
+//   config/general   { tasaUSD, tasaMLC, categorias[], subcategorias[{cat,nombre}], telefonoReporte }
 //   turno/actual     { id, inicio }
-//   productos/{id}   { codigo, nombre, categoria, moneda, precio, costoCents, stockInicial, stock }
-//   empleados/{id}   { nombre, activo, inicioTurno(ms), sal, pinHash }
+//   productos/{id}   { codigo, nombre, variante, categoria, subcategoria, foto, moneda, precio,
+//                      costo, costoMoneda, costoCents, stockInicial, stock }
+//   empleados/{id}   { nombre, activo, inicioTurno(ms), corteTs(ms), sal, pinHash }
 //   ventas/{id}      ticket completo, con turnoId
 //   mermas/{id}      con turnoId
+//   cortes/{id}      arqueo cerrado por un cajero (turnoId, cajero, esperado, contado, diferencia)
 //   cierres/{id}     reporte Z guardado al cerrar cada turno
 //
 // El stock se cambia con FieldValue.increment(): dos cajas vendiendo a la vez
@@ -14,28 +16,74 @@
 
 import { db, FieldValue } from './firebase.js';
 import { estado } from './estado.js';
-import { aMillis } from './utils.js';
-import { CATEGORIAS_POR_DEFECTO, TASAS_POR_DEFECTO } from './config.js';
+import { aMillis, fotoValida, conTiempo } from './utils.js';
+import { CATEGORIAS_POR_DEFECTO, TASAS_POR_DEFECTO, DIAS_CIERRES } from './config.js';
+import { costoUnitUSD, costoUnitCUP } from './money.js';
 
 const col = (nombre) => db.collection(nombre);
 
 let bajas = []; // funciones para dejar de escuchar
 let bajasTurno = [];
 
+// ---------------------------------------------------------------- eventos (para los avisos)
+// Se avisa de: ventas nuevas, producto nuevo y cambios de stock, pero solo de lo que ocurre
+// DESPUÉS de la primera carga (para no llenar el teléfono de avisos al abrir la app).
+
+const oyentes = [];
+export const alEvento = (fn) => oyentes.push(fn);
+const emitir = (ev) =>
+  oyentes.forEach((fn) => {
+    try {
+      fn(ev);
+    } catch (e) {
+      console.error('Aviso:', e);
+    }
+  });
+
 export const nuevoIdTurno = () =>
   `${new Date().toISOString().slice(0, 10)}-${Math.random().toString(36).slice(2, 6)}`;
 
-function normalizarProducto(id, d) {
+export function normalizarProducto(id, d) {
+  const costoMoneda = d.costoMoneda === 'CUP' ? 'CUP' : 'USD';
+  const costo = d.costo !== undefined && d.costo !== null ? Number(d.costo) || 0 : Number(d.costoCents) || 0;
   return {
     id,
     codigo: d.codigo || '',
     nombre: d.nombre || 'Sin nombre',
+    variante: d.variante || '',
     categoria: d.categoria || 'Varios',
+    subcategoria: d.subcategoria || '',
+    foto: fotoValida(d.foto) ? d.foto : '',
     moneda: d.moneda === 'CUP' ? 'CUP' : 'USD',
     precio: Number(d.precio) || 0,
-    costoCents: Number(d.costoCents) || 0,
+    costo,
+    costoMoneda,
+    costoCents: costoMoneda === 'USD' ? costo : 0,
     stockInicial: Number(d.stockInicial) || 0,
     stock: Number(d.stock) || 0,
+  };
+}
+
+function normalizarSubcategorias(v) {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((s) => s && typeof s.cat === 'string' && typeof s.nombre === 'string' && s.nombre.trim())
+    .map((s) => ({ cat: s.cat, nombre: s.nombre.trim() }));
+}
+
+/** Crea una función que recibe cada "snapshot" y avisa solo de los documentos añadidos después de la carga inicial. */
+function observadorDeNuevos(procesar) {
+  let base = false;
+  return (snap) => {
+    if (!base) {
+      if (!snap.metadata.fromCache) base = true; // la primera copia real del servidor es la base
+      return;
+    }
+    const nuevos = snap
+      .docChanges()
+      .filter((c) => c.type === 'added')
+      .map((c) => ({ id: c.doc.id, ...c.doc.data() }));
+    if (nuevos.length) procesar(nuevos);
   };
 }
 
@@ -53,14 +101,19 @@ function escucharTurno(turnoId, cambio, error) {
   bajasTurno = [];
   estado.ventas = [];
   estado.mermas = [];
+  estado.cortes = [];
+  estado.pendientes = 0;
   if (!turnoId) return;
 
+  const avisarVentas = observadorDeNuevos((ventas) => emitir({ tipo: 'ventas', ventas }));
   bajasTurno.push(
     col('ventas')
       .where('turnoId', '==', turnoId)
       .onSnapshot((s) => {
         estado.ventas = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.ts - a.ts);
+        estado.pendientes = s.docs.filter((d) => d.metadata.hasPendingWrites).length;
         cambio();
+        avisarVentas(s);
       }, error),
   );
   bajasTurno.push(
@@ -71,6 +124,16 @@ function escucharTurno(turnoId, cambio, error) {
         cambio();
       }, error),
   );
+  if (estado.esDueno) {
+    bajasTurno.push(
+      col('cortes')
+        .where('turnoId', '==', turnoId)
+        .onSnapshot((s) => {
+          estado.cortes = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.hasta - a.hasta);
+          cambio();
+        }, (e) => console.warn('No se pudieron leer los arqueos:', e.code)),
+    );
+  }
 }
 
 export function iniciarEscuchas(cambio, fallo) {
@@ -93,19 +156,40 @@ export function iniciarEscuchas(cambio, fallo) {
           if (Number(d.tasaUSD) > 0) estado.tasaUSD = Number(d.tasaUSD);
           if (Number(d.tasaMLC) > 0) estado.tasaMLC = Number(d.tasaMLC);
           estado.categorias = Array.isArray(d.categorias) ? d.categorias : [];
+          estado.subcategorias = normalizarSubcategorias(d.subcategorias);
+          if (typeof d.telefonoReporte === 'string' && d.telefonoReporte.trim()) {
+            estado.telefonoReporte = d.telefonoReporte.trim();
+          }
         }
         estado.cargado.config = true;
         cambio();
       }, error),
   );
 
+  let baseProductos = false;
   bajas.push(
     col('productos').onSnapshot((s) => {
+      const antes = new Map(estado.productos.map((p) => [p.id, p.stock]));
       estado.productos = s.docs
         .map((d) => normalizarProducto(d.id, d.data()))
         .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
       estado.cargado.productos = true;
       cambio();
+
+      if (!baseProductos) {
+        if (!s.metadata.fromCache) baseProductos = true;
+        return;
+      }
+      s.docChanges().forEach((c) => {
+        const producto = normalizarProducto(c.doc.id, c.doc.data());
+        if (c.type === 'added') emitir({ tipo: 'producto-nuevo', producto });
+        else if (c.type === 'modified') {
+          const previo = antes.get(producto.id);
+          if (previo !== undefined && previo !== producto.stock) {
+            emitir({ tipo: 'stock', producto, antes: previo, ahora: producto.stock });
+          }
+        }
+      });
     }, error),
   );
 
@@ -119,6 +203,7 @@ export function iniciarEscuchas(cambio, fallo) {
             nombre: x.nombre || 'Sin nombre',
             activo: !!x.activo,
             inicioTurno: aMillis(x.inicioTurno),
+            corteTs: aMillis(x.corteTs),
             sal: x.sal || null,
             pinHash: x.pinHash || null,
           };
@@ -149,19 +234,51 @@ export function iniciarEscuchas(cambio, fallo) {
   );
 
   if (estado.esDueno) {
+    // Turnos cerrados de los últimos DIAS_CIERRES días (antes se pedían "los últimos 30" sin fecha).
+    const desde = Date.now() - DIAS_CIERRES * 24 * 3600 * 1000;
     bajas.push(
       col('cierres')
+        .where('cerradoEn', '>=', desde)
         .orderBy('cerradoEn', 'desc')
-        .limit(30)
-        .onSnapshot((s) => {
-          estado.cierres = s.docs.map((d) => ({ id: d.id, ...d.data() }));
-          cambio();
-        }, (e) => console.warn('No se pudieron leer los cierres:', e.code)),
+        .onSnapshot(
+          (s) => {
+            estado.errorCierres = null;
+            estado.cierres = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+            cambio();
+          },
+          (e) => {
+            console.warn('No se pudieron leer los cierres:', e.code);
+            estado.errorCierres = e.code || 'error';
+            cambio();
+          },
+        ),
     );
   }
 }
 
-// -------------------------------------------------------------- escrituras
+// ---------------------------------------------------------------- lecturas históricas
+
+async function leerConRespaldo(consulta) {
+  try {
+    return await conTiempo(consulta.get(), 15000);
+  } catch (e) {
+    if (e && e.code === 'permission-denied') throw e;
+    return consulta.get({ source: 'cache' }); // sin internet: lo que haya guardado en el aparato
+  }
+}
+
+/** Ventas desde una fecha (para el reporte semanal). { lista, deCache } */
+export async function ventasDesde(ms) {
+  const s = await leerConRespaldo(col('ventas').where('ts', '>=', ms));
+  return { lista: s.docs.map((d) => ({ id: d.id, ...d.data() })), deCache: s.metadata.fromCache };
+}
+
+export async function mermasDesde(ms) {
+  const s = await leerConRespaldo(col('mermas').where('ts', '>=', ms));
+  return s.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+// ---------------------------------------------------------------- escrituras
 
 /** Aplica operaciones en lotes de 400 (el límite de Firestore es 500). Devuelve una promesa. */
 function enLotes(operaciones) {
@@ -182,6 +299,7 @@ export function sembrarDatosIniciales() {
       tasaUSD: TASAS_POR_DEFECTO.usd,
       tasaMLC: TASAS_POR_DEFECTO.mlc,
       categorias: CATEGORIAS_POR_DEFECTO,
+      subcategorias: [],
     });
   }
   if (!estado.turno) {
@@ -205,6 +323,8 @@ export const reabastecerProducto = (id, n) =>
 export const crearEmpleado = (datos) => col('empleados').add(datos);
 export const actualizarEmpleado = (id, datos) => col('empleados').doc(id).update(datos);
 export const eliminarEmpleado = (id) => col('empleados').doc(id).delete();
+/** Un cajero cambia su propio PIN (las reglas solo le dejan tocar estos dos campos). */
+export const cambiarPinEmpleado = (id, sal, pinHash) => col('empleados').doc(id).update({ sal, pinHash });
 
 /**
  * Registra la venta y descuenta el stock en una sola operación atómica.
@@ -231,8 +351,20 @@ export function registrarMerma(producto, cantidad, motivo) {
     producto: producto.nombre,
     cantidad,
     motivo,
-    perdidaCents: (producto.costoCents || 0) * cantidad,
+    perdidaCents: costoUnitUSD(producto, estado.tasaUSD) * cantidad,
+    perdidaCUP: costoUnitCUP(producto, estado.tasaUSD) * cantidad,
   });
+  return batch.commit();
+}
+
+/**
+ * Cierra el arqueo de un cajero: guarda el corte y marca desde dónde empieza su próximo arqueo.
+ * (Así sus ventas anteriores ya no se vuelven a contar.)
+ */
+export function registrarCorte(corte, empleadoId) {
+  const batch = db.batch();
+  batch.set(col('cortes').doc(), corte);
+  batch.update(col('empleados').doc(empleadoId), { corteTs: corte.hasta });
   return batch.commit();
 }
 
@@ -257,6 +389,16 @@ export async function leerDatosAntiguosNube() {
   return doc.exists ? doc.data() : null;
 }
 
+const unirSubcategorias = (a, b) => {
+  const visto = new Set();
+  return [...a, ...b].filter((s) => {
+    const k = `${s.cat}|${s.nombre}`;
+    if (visto.has(k)) return false;
+    visto.add(k);
+    return true;
+  });
+};
+
 /**
  * Aplica un plan de migracion.js.
  * omitirExistentes = true: no pisa productos/empleados que ya existen (migración repetible).
@@ -273,6 +415,8 @@ export function aplicarPlan(plan, { omitirExistentes }) {
   }
   const categorias = [...new Set([...estado.categorias, ...plan.config.categorias])];
   if (categorias.length) config.categorias = categorias;
+  const subs = unirSubcategorias(estado.subcategorias, plan.config.subcategorias || []);
+  if (subs.length) config.subcategorias = subs;
   if (Object.keys(config).length) {
     ops.push((b) => b.set(col('config').doc('general'), config, { merge: true }));
   }

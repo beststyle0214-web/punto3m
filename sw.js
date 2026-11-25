@@ -1,10 +1,12 @@
-// Service worker: deja abrir la app sin internet.
+// Service worker: deja abrir y usar la app sin internet.
 //  - Archivos propios: primero la red (para recibir actualizaciones) y, si no hay, la copia guardada.
 //  - Librerías de CDN (Tailwind, Firebase): copia guardada primero y se renueva en segundo plano.
+//    Se descargan al instalar, así que después de la primera vez la app abre aunque Google no responda.
 //  - Firestore/Auth NO pasan por aquí: su propio caché offline guarda los datos.
+//  - Avisos: muestra las notificaciones y, al tocarlas, abre la app.
 // Al cambiar archivos de la app, sube VERSION para limpiar copias viejas.
 
-const VERSION = 'p3m-v2';
+const VERSION = 'p3m-v4';
 const ARCHIVOS = [
   './',
   'index.html',
@@ -16,6 +18,9 @@ const ARCHIVOS = [
   'config.js',
   'firebase.js',
   'auth.js',
+  'avisos.js',
+  'cuenta.js',
+  'escaner.js',
   'data.js',
   'estado.js',
   'ui.js',
@@ -27,13 +32,25 @@ const ARCHIVOS = [
   'migracion.js',
   'utils.js',
 ];
+const CDN_URLS = [
+  'https://cdn.tailwindcss.com',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
+];
 const CDN = ['cdn.tailwindcss.com', 'www.gstatic.com'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(VERSION)
-      .then((c) => c.addAll(ARCHIVOS))
+      .then(async (c) => {
+        await c.addAll(ARCHIVOS);
+        // Las librerías externas se guardan "a mejor esfuerzo": si una falla, no se rompe la instalación.
+        await Promise.all(
+          CDN_URLS.map((u) => c.add(new Request(u, { mode: 'no-cors' })).catch(() => {})),
+        );
+      })
       .then(() => self.skipWaiting()),
   );
 });
@@ -63,7 +80,9 @@ self.addEventListener('fetch', (e) => {
           return res;
         })
         .catch(() =>
-          caches.match(req).then((r) => r || (req.mode === 'navigate' ? caches.match('index.html') : Response.error())),
+          caches.match(req, { ignoreSearch: true }).then(
+            (r) => r || (req.mode === 'navigate' ? caches.match('index.html') : Response.error()),
+          ),
         ),
     );
     return;
@@ -74,13 +93,26 @@ self.addEventListener('fetch', (e) => {
       caches.match(req).then((guardado) => {
         const red = fetch(req)
           .then((res) => {
-            const copia = res.clone();
-            caches.open(VERSION).then((c) => c.put(req, copia));
+            if (res && (res.ok || res.type === 'opaque')) {
+              const copia = res.clone();
+              caches.open(VERSION).then((c) => c.put(req, copia));
+            }
             return res;
           })
-          .catch(() => guardado);
+          .catch(() => guardado || Response.error());
         return guardado || red;
       }),
     );
   }
+});
+
+// Al tocar un aviso, se abre (o se enfoca) la app.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ventanas) => {
+      const abierta = ventanas.find((v) => 'focus' in v);
+      return abierta ? abierta.focus() : self.clients.openWindow('./');
+    }),
+  );
 });

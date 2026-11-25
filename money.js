@@ -40,22 +40,42 @@ export function precioSecundario(p, tasaUSD) {
     : `≈ ${fmtMinor(precioUnitCUP(p, tasaUSD), 'CUP')}`;
 }
 
+// El costo también se guarda en su propia moneda base:
+//   { costoMoneda: 'USD', costo: 180 }  o  { costoMoneda: 'CUP', costo: 576 }
+// (los productos antiguos solo traen costoCents, en USD).
+
+export const costoMonedaDe = (p) => (p.costoMoneda === 'CUP' ? 'CUP' : 'USD');
+const costoBase = (p) => (p.costo !== undefined && p.costo !== null ? Number(p.costo) || 0 : Number(p.costoCents) || 0);
+
+export function costoUnitCUP(p, tasaUSD) {
+  return costoMonedaDe(p) === 'CUP' ? costoBase(p) : Math.round((costoBase(p) * tasaUSD) / 100);
+}
+
+export function costoUnitUSD(p, tasaUSD) {
+  return costoMonedaDe(p) === 'CUP' ? Math.round((costoBase(p) / tasaUSD) * 100) : costoBase(p);
+}
+
+/** Costo tal como se definió: "$1.80 USD" o "576 CUP". */
+export const costoPrincipal = (p) => fmtMinor(costoBase(p), costoMonedaDe(p));
+
 /**
  * Totales de un carrito.
  * @param lineas [{ producto, cantidad }]
  * @param tasas  { usd, mlc }  (cuántos CUP vale 1 USD / 1 MLC)
- * @returns { cup, usd, mlc, costo }  (cup en pesos; usd, mlc y costo en centavos)
+ * @returns { cup, usd, mlc, costo, costoCUP }  (cup y costoCUP en pesos; usd, mlc y costo en centavos)
  */
 export function totalesCarrito(lineas, tasas) {
   let cup = 0;
   let usd = 0;
   let costo = 0;
+  let costoCUP = 0;
   for (const { producto: p, cantidad: n } of lineas) {
     cup += precioUnitCUP(p, tasas.usd) * n;
     usd += precioUnitUSD(p, tasas.usd) * n;
-    costo += (p.costoCents || 0) * n;
+    costo += costoUnitUSD(p, tasas.usd) * n;
+    costoCUP += costoUnitCUP(p, tasas.usd) * n;
   }
-  return { cup, usd, mlc: Math.round((cup / tasas.mlc) * 100), costo };
+  return { cup, usd, mlc: Math.round((cup / tasas.mlc) * 100), costo, costoCUP };
 }
 
 /** Monto a cobrar (en unidades menores) según la moneda elegida. */

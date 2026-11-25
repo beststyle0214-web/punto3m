@@ -47,3 +47,50 @@ export function descargarArchivo(nombre, texto, tipo = 'application/json') {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+/** Nombre visible de un producto: "Refresco · Naranja" (nombre + sabor / tipo). */
+export const nombreProducto = (p) => (p.variante ? `${p.nombre} · ${p.variante}` : p.nombre);
+
+/** Solo se muestran fotos que sean imágenes en base64 (nada de enlaces externos). */
+export const fotoValida = (s) =>
+  typeof s === 'string' && s.length < 250000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s);
+
+/**
+ * Reduce una foto a un cuadrado pequeño (centrado) en JPEG, para guardarla dentro del
+ * producto sin gastar internet ni espacio. Devuelve un texto "data:image/jpeg;base64,...".
+ */
+export async function comprimirImagen(archivo, lado = 256, calidad = 0.72) {
+  const url = URL.createObjectURL(archivo);
+  try {
+    const img = await new Promise((ok, mal) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => mal(new Error('No se pudo leer la imagen'));
+      i.src = url;
+    });
+    const corto = Math.min(img.naturalWidth, img.naturalHeight);
+    if (!corto) throw new Error('Imagen vacía');
+    const tam = Math.min(lado, corto);
+    const canvas = document.createElement('canvas');
+    canvas.width = tam;
+    canvas.height = tam;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; // los PNG con fondo transparente quedan sobre blanco
+    ctx.fillRect(0, 0, tam, tam);
+    ctx.drawImage(img, (img.naturalWidth - corto) / 2, (img.naturalHeight - corto) / 2, corto, corto, 0, 0, tam, tam);
+    return canvas.toDataURL('image/jpeg', calidad);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Espera a una promesa como máximo `ms` milisegundos; si tarda más, rechaza con 'timeout'. */
+export function conTiempo(promesa, ms) {
+  return new Promise((ok, mal) => {
+    const t = setTimeout(() => mal(Object.assign(new Error('timeout'), { code: 'timeout' })), ms);
+    promesa.then(
+      (v) => { clearTimeout(t); ok(v); },
+      (e) => { clearTimeout(t); mal(e); },
+    );
+  });
+}

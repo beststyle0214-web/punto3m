@@ -2,8 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1e4fa0">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Punto 3 M - Gestor de Mi Negocio</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -24,7 +25,7 @@
          comenta estas dos líneas <script> y descomenta el <link> de abajo. -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
-    
+    <!-- <link rel="stylesheet" href="css/tailwind.css"> -->
 
     <link rel="stylesheet" href="styles.css">
 
@@ -43,16 +44,18 @@
     </div>
 
     <!-- Inicio de sesión -->
-    <div id="pantalla-login" class="fixed inset-0 z-[55] bg-slate-100 dark:bg-slate-900 hidden items-center justify-center p-4 no-print">
+    <div id="pantalla-login" class="fixed inset-0 z-[55] bg-slate-100 dark:bg-slate-900 hidden items-center justify-center p-4 no-print overflow-y-auto">
         <form id="form-login" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
             <div class="text-center">
                 <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Punto 3 M 🚀</h1>
                 <p class="text-xs text-slate-500">Inicia sesión para continuar</p>
             </div>
-            <input type="email" id="login-email" autocomplete="username" required placeholder="Correo" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-sm">
-            <input type="password" id="login-password" autocomplete="current-password" required placeholder="Contraseña" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-sm">
+            <input type="email" id="login-email" autocomplete="username" required placeholder="Correo" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-base">
+            <input type="password" id="login-password" autocomplete="current-password" required placeholder="Contraseña" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-base">
             <p id="login-error" class="hidden text-xs text-red-600 font-semibold"></p>
+            <p id="login-info" class="hidden text-xs text-emerald-700 dark:text-emerald-400 font-semibold"></p>
             <button type="submit" id="btn-login" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm">Entrar</button>
+            <button type="button" data-action="olvide-password" class="w-full text-xs text-indigo-600 dark:text-indigo-400 underline py-1">¿Olvidaste tu contraseña?</button>
         </form>
     </div>
 
@@ -61,14 +64,17 @@
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
             <div>
                 <h1 class="text-2xl font-bold">Punto 3 M 🚀</h1>
-                <p class="text-xs text-indigo-200"><span id="badge-usuario">Sin sesión</span> · <span id="badge-conexion">🟢 En línea</span></p>
+                <p class="text-xs text-indigo-200"><span id="badge-usuario">Sin sesión</span> · <span id="badge-conexion">🟢 En línea</span>
+                    <span id="badge-pendientes" class="hidden ml-1 bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full font-bold"></span></p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <span id="badge-rol" class="text-xs bg-indigo-500 dark:bg-indigo-700 px-3 py-1 rounded-full font-medium">Cajero: Ninguno</span>
-                <button type="button" id="btn-dark-mode" data-action="modo-oscuro" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-2.5 py-1.5 rounded-lg font-semibold" aria-label="Cambiar modo oscuro">🌙</button>
-                <button type="button" data-action="abrir-cajeros" class="bg-blue-600 hover:bg-blue-700 text-xs px-3 py-1.5 rounded-lg font-semibold shadow">👥 Cajero</button>
-                <button type="button" id="btn-cambiar-modo" data-action="acceso-dueno" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-1.5 rounded-lg font-semibold">🔒 Dueño</button>
-                <button type="button" data-action="cerrar-sesion" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-1.5 rounded-lg font-semibold">Salir</button>
+                <span id="badge-rol" class="text-xs bg-indigo-500 dark:bg-indigo-700 px-3 py-1.5 rounded-full font-medium">Cajero: Ninguno</span>
+                <button type="button" id="btn-instalar" data-action="instalar-app" class="hidden bg-emerald-500 hover:bg-emerald-600 text-xs px-3 py-2 rounded-lg font-semibold">📲 Instalar</button>
+                <button type="button" id="btn-dark-mode" data-action="modo-oscuro" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold" aria-label="Cambiar modo oscuro">🌙</button>
+                <button type="button" data-action="abrir-cajeros" class="bg-blue-600 hover:bg-blue-700 text-xs px-3 py-2 rounded-lg font-semibold shadow">👥 Cajero</button>
+                <button type="button" id="btn-cambiar-modo" data-action="acceso-dueno" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">🔒 Dueño</button>
+                <button type="button" data-action="abrir-cuenta" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">👤 Cuenta</button>
+                <button type="button" data-action="cerrar-sesion" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">Salir</button>
             </div>
         </div>
     </header>
@@ -81,45 +87,51 @@
         </div>
     </div>
 
-    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6 no-print">
+    <main class="max-w-7xl mx-auto px-4 py-4 sm:py-6 pb-28 lg:pb-6 space-y-6 no-print">
 
         <!-- VISTA DE VENTA -->
-        <div id="vista-pos" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div id="vista-pos" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <section class="lg:col-span-2 space-y-6">
-                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6">
                     <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                         <h2 class="text-xl font-semibold text-indigo-600 dark:text-indigo-400">Registrar Venta</h2>
-                        <button type="button" data-action="abrir-arqueo" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">💵 Arqueo de Caja</button>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" data-action="sms-reporte" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">📩 Reporte por SMS</button>
+                            <button type="button" data-action="abrir-arqueo" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">💵 Arqueo de Caja</button>
+                        </div>
                     </div>
-                    <div class="flex flex-wrap gap-1 text-xs mb-4" id="botones-categorias"></div>
+                    <div class="flex flex-wrap gap-1.5 text-xs mb-2" id="botones-categorias"></div>
+                    <div class="flex flex-wrap gap-1.5 text-xs mb-4 hidden" id="botones-subcategorias"></div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                         <div class="relative">
-                            <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-lg border border-indigo-200 dark:border-indigo-900 flex items-center gap-2">
+                            <div class="bg-indigo-50 dark:bg-indigo-950/40 p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-900 flex items-center gap-2">
                                 <span class="text-sm">🔍</span>
-                                <input type="text" id="input-buscador-predictivo" placeholder="Buscar producto..." class="flex-1 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-1.5 text-xs font-medium" autocomplete="off">
+                                <input type="text" id="input-buscador-predictivo" placeholder="Buscar producto..." class="flex-1 min-w-0 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-2 text-sm font-medium" autocomplete="off">
+                                <button type="button" data-action="limpiar-busqueda" class="px-2 py-1.5 text-slate-500 text-sm" aria-label="Limpiar búsqueda">✕</button>
                             </div>
-                            <div id="lista-sugerencias" class="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-xl z-30 hidden max-h-48 overflow-y-auto"></div>
+                            <div id="lista-sugerencias" class="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg shadow-xl z-30 hidden max-h-56 overflow-y-auto"></div>
                         </div>
-                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-3 rounded-lg border border-indigo-200 dark:border-indigo-900 flex items-center gap-2">
-                            <span class="text-sm">📷</span>
-                            <input type="text" id="input-codigo-barras" placeholder="Escanear código de barras..." class="flex-1 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-1.5 text-xs font-medium" autocomplete="off">
+                        <div class="bg-indigo-50 dark:bg-indigo-950/40 p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-900 flex items-center gap-2">
+                            <button type="button" data-action="abrir-escaner" class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm font-bold" aria-label="Escanear con la cámara">📷</button>
+                            <input type="text" id="input-codigo-barras" placeholder="Código de barras..." class="flex-1 min-w-0 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-2 text-sm font-medium" autocomplete="off" inputmode="numeric">
+                            <button type="button" data-action="limpiar-codigo" class="px-2 py-1.5 text-slate-500 text-sm" aria-label="Limpiar código">✕</button>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-2" id="product-grid"></div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mb-2" id="product-grid"></div>
                 </div>
             </section>
 
             <!-- Carrito -->
-            <section class="space-y-6">
-                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 flex flex-col justify-between h-fit border-2 border-indigo-200 dark:border-indigo-900">
+            <section id="seccion-carrito" class="space-y-6 lg:sticky lg:top-4 self-start scroll-mt-4">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 flex flex-col justify-between h-fit border-2 border-indigo-200 dark:border-indigo-900">
                     <div>
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="font-bold text-lg text-indigo-600 dark:text-indigo-400">🛒 Carrito Actual</h3>
-                            <button type="button" data-action="vaciar-carrito" class="text-xs text-red-500 hover:underline">Limpiar</button>
+                            <button type="button" data-action="vaciar-carrito" class="text-xs text-red-600 border border-red-300 rounded-lg px-3 py-1.5 font-semibold">🧹 Limpiar</button>
                         </div>
-                        <div class="border dark:border-slate-700 rounded-lg p-3 mb-4 bg-slate-50 dark:bg-slate-900/50 min-h-[140px] max-h-60 overflow-y-auto" id="lista-carrito">
+                        <div class="border dark:border-slate-700 rounded-lg p-3 mb-4 bg-slate-50 dark:bg-slate-900/50 min-h-[140px] max-h-72 overflow-y-auto" id="lista-carrito">
                             <p class="text-slate-400 text-sm italic">Carrito vacío.</p>
                         </div>
                         <div class="bg-indigo-50 dark:bg-indigo-950/50 p-4 rounded-lg mb-4 flex justify-between items-center border border-indigo-100 dark:border-indigo-900">
@@ -134,9 +146,9 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
-                        <button type="button" data-action="cobrar" data-moneda="USD" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow text-xs">USD 💵</button>
-                        <button type="button" data-action="cobrar" data-moneda="MLC" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow text-xs">MLC 💳</button>
-                        <button type="button" data-action="cobrar" data-moneda="CUP" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow text-xs">CUP 🧮</button>
+                        <button type="button" data-action="cobrar" data-moneda="USD" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition shadow text-sm">USD 💵</button>
+                        <button type="button" data-action="cobrar" data-moneda="MLC" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition shadow text-sm">MLC 💳</button>
+                        <button type="button" data-action="cobrar" data-moneda="CUP" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition shadow text-sm">CUP 🧮</button>
                     </div>
                 </div>
             </section>
@@ -148,43 +160,90 @@
             <div class="bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 p-4 rounded-xl flex flex-wrap justify-between items-center gap-3">
                 <div>
                     <h3 class="font-bold text-amber-900 dark:text-amber-200 text-sm">🛠️ Panel de Administración</h3>
-                    <p class="text-xs text-amber-700 dark:text-amber-400">Inventario, turnos, cierres y respaldos. Los datos se sincronizan en tiempo real con la nube.</p>
+                    <p class="text-xs text-amber-700 dark:text-amber-400">Inventario, turnos, cierres y respaldos. Los datos se sincronizan con la nube cuando hay internet.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" data-action="importar-antiguo" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">⬆️ Importar datos anteriores</button>
-                    <button type="button" data-action="exportar-respaldo" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">💾 Exportar Respaldo</button>
-                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow cursor-pointer">
+                    <button type="button" data-action="importar-antiguo" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow">⬆️ Importar datos anteriores</button>
+                    <button type="button" data-action="exportar-respaldo" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow">💾 Exportar Respaldo</button>
+                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow cursor-pointer">
                         📂 Restaurar Datos
                         <input type="file" id="input-importar" accept=".json,application/json" class="hidden">
                     </label>
-                    <button type="button" data-action="cerrar-modo-dueno" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">🔒 Cerrar Modo Dueño</button>
+                    <button type="button" data-action="cerrar-modo-dueno" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow">🔒 Cerrar Modo Dueño</button>
                 </div>
             </div>
 
+            <!-- Atajos a cada sección -->
+            <nav class="sticky top-0 z-30 -mx-4 px-4 py-2 bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur overflow-x-auto whitespace-nowrap text-xs font-semibold space-x-2" aria-label="Secciones del panel">
+                <a href="#sec-alertas" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">🚨 Alertas</a>
+                <a href="#sec-inventario" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📦 Inventario</a>
+                <a href="#sec-categorias" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📁 Categorías</a>
+                <a href="#sec-personal" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">👥 Personal</a>
+                <a href="#sec-historial" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📋 Tickets</a>
+                <a href="#sec-financiero" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📊 Finanzas</a>
+                <a href="#sec-semana" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📅 Reportes</a>
+                <a href="#sec-cierres" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">🗂️ Cierres</a>
+            </nav>
+
             <!-- Stock crítico -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-red-300 dark:border-red-900">
+            <div id="sec-alertas" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-red-300 dark:border-red-900">
                 <h2 class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">🚨 Alertas de Stock Bajo (&lt; 5 unidades)</h2>
                 <div id="contenedor-stock-critico" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
             </div>
 
-            <!-- Categorías -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
-                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-3">📁 Gestión de Categorías</h2>
-                <div class="flex flex-wrap gap-2 items-center mb-4">
-                    <input type="text" id="input-nueva-categoria" placeholder="Nombre de nueva categoría..." class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
-                    <button type="button" data-action="agregar-categoria" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold shadow">+ Añadir Categoría</button>
+            <!-- Inventario -->
+            <div id="sec-inventario" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📦 Inventario y Stock (Inicial vs. Actual)</h2>
+                    <div class="flex gap-2">
+                        <button type="button" data-action="abrir-tasa" class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-2.5 rounded-lg font-medium">⚙️ Tasas y ajustes</button>
+                        <button type="button" data-action="nuevo-producto" class="bg-emerald-600 text-white text-sm px-3 py-2.5 rounded-lg hover:bg-emerald-700 font-medium">+ Producto</button>
+                    </div>
                 </div>
-                <div class="flex flex-wrap gap-2 items-center" id="contenedor-chips-categorias"></div>
+                <div class="mb-4 flex gap-2">
+                    <input type="text" id="input-buscador-inventario" placeholder="🔍 Filtrar por nombre, categoría o código..." class="flex-1 min-w-0 border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm">
+                    <button type="button" data-action="limpiar-filtro-inventario" class="text-xs bg-slate-200 dark:bg-slate-700 px-3 rounded-lg font-semibold">🧹 Limpiar</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-b dark:border-slate-700">
+                            <tr>
+                                <th class="p-3">Producto</th>
+                                <th class="p-3">Categoría</th>
+                                <th class="p-3">Costo / Precio</th>
+                                <th class="p-3">Ini. / Actual</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-inventario" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Categorías y subcategorías -->
+            <div id="sec-categorias" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-1">📁 Categorías y Subcategorías</h2>
+                <p class="text-xs text-slate-500 mb-3">Ejemplo: categoría <strong>Bebidas</strong> → subcategoría <strong>Refresco</strong> → productos "Cola", "Naranja"… (usa el campo "Sabor / tipo").</p>
+                <div class="flex flex-wrap gap-2 items-center mb-3">
+                    <input type="text" id="input-nueva-categoria" placeholder="Nombre de nueva categoría..." class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm flex-1 min-w-[200px]">
+                    <button type="button" data-action="agregar-categoria" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-3 rounded-lg font-bold shadow">+ Añadir Categoría</button>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center mb-4">
+                    <select id="select-sub-categoria" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm"></select>
+                    <input type="text" id="input-nueva-subcategoria" placeholder="Nueva subcategoría (ej.: Refresco)..." class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm flex-1 min-w-[200px]">
+                    <button type="button" data-action="agregar-subcategoria" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-3 rounded-lg font-bold shadow">+ Añadir Subcategoría</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" id="contenedor-chips-categorias"></div>
             </div>
 
             <!-- Personal -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+            <div id="sec-personal" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <div>
                         <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">👥 Control de Asistencia y Turnos</h2>
                         <p class="text-xs text-slate-500">Cronómetro en vivo del tiempo transcurrido de cada trabajador en turno. Cada cajero entra con su PIN.</p>
                     </div>
-                    <button type="button" data-action="nuevo-empleado" class="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold">+ Añadir Trabajador</button>
+                    <button type="button" data-action="nuevo-empleado" class="bg-emerald-600 text-white text-xs px-3 py-2.5 rounded-lg font-bold">+ Añadir Trabajador</button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
@@ -201,39 +260,11 @@
                 </div>
             </div>
 
-            <!-- Inventario -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
-                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📦 Inventario y Stock (Inicial vs. Actual)</h2>
-                    <div class="flex space-x-2">
-                        <button type="button" data-action="abrir-tasa" class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-2 rounded-lg font-medium">⚙️ Tasa Cambio</button>
-                        <button type="button" data-action="nuevo-producto" class="bg-emerald-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-emerald-700 font-medium">+ Producto</button>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <input type="text" id="input-buscador-inventario" placeholder="🔍 Filtrar por nombre, categoría o código..." class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2 text-sm">
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-b dark:border-slate-700">
-                            <tr>
-                                <th class="p-3">Producto</th>
-                                <th class="p-3">Cat.</th>
-                                <th class="p-3">Costo / Precio</th>
-                                <th class="p-3">Ini. / Actual</th>
-                                <th class="p-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-inventario" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
-                    </table>
-                </div>
-            </div>
-
             <!-- Mermas -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
-                <div class="flex justify-between items-center mb-4">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="flex justify-between items-center mb-4 gap-2">
                     <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📉 Control de Mermas</h2>
-                    <button type="button" data-action="abrir-merma" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-bold">+ Registrar Merma</button>
+                    <button type="button" data-action="abrir-merma" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold">+ Registrar Merma</button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
@@ -246,17 +277,18 @@
             </div>
 
             <!-- Historial -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
+            <div id="sec-historial" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📋 Historial de Tickets (turno actual)</h2>
-                    <div class="flex items-center space-x-2">
-                        <select id="filtro-historial-cajero" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-1 text-xs">
+                    <div class="flex items-center gap-2">
+                        <select id="filtro-historial-cajero" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-2 text-xs">
                             <option value="TODOS">Todos los cajeros</option>
                         </select>
+                        <button type="button" data-action="limpiar-filtro-historial" class="text-xs bg-slate-200 dark:bg-slate-700 px-3 py-2 rounded-lg font-semibold">🧹</button>
                         <span class="text-xs bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-medium" id="contador-tickets">0 tickets</span>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                <div class="overflow-x-auto max-h-72 overflow-y-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700 sticky top-0">
                             <tr><th class="p-3">Hora</th><th class="p-3">Cajero</th><th class="p-3">Detalle</th><th class="p-3">Cobrado</th><th class="p-3">Total</th><th class="p-3 text-right">Recibo</th></tr>
@@ -267,41 +299,85 @@
             </div>
 
             <!-- Panel financiero -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900 space-y-5">
+            <div id="sec-financiero" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900 space-y-5">
                 <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📊 Panel Financiero y Cuadre de Cierre</h2>
+                <p class="text-xs text-slate-500">Turno actual. Cuando se cierra el turno, todo vuelve a 0 y el resumen queda guardado en "Turnos cerrados".</p>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="bg-indigo-50 dark:bg-indigo-950/40 p-4 rounded-xl border dark:border-slate-700">
                         <p class="text-xs text-indigo-600 font-medium">Ventas Totales</p>
                         <p class="text-2xl font-extrabold mt-1" id="ventas-dia">$0.00 USD</p>
+                        <p class="text-sm font-bold text-indigo-700 dark:text-indigo-300" id="ventas-dia-cup">0 CUP</p>
                     </div>
                     <div class="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl border dark:border-slate-700">
                         <p class="text-xs text-amber-600 font-medium">Gastos / Mermas</p>
                         <p class="text-2xl font-extrabold mt-1" id="gastos-dia">$0.00 USD</p>
+                        <p class="text-sm font-bold text-amber-700 dark:text-amber-300" id="gastos-dia-cup">0 CUP</p>
                     </div>
                     <div class="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-xl border dark:border-slate-700">
                         <p class="text-xs text-emerald-600 font-medium">Ganancia Neta</p>
                         <p class="text-2xl font-extrabold mt-1" id="ganancia-neta-dia">$0.00 USD</p>
+                        <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300" id="ganancia-neta-dia-cup">0 CUP</p>
                     </div>
                 </div>
+                <p class="text-xs bg-slate-50 dark:bg-slate-900/60 border dark:border-slate-700 rounded-lg p-3">💵 Efectivo que debe haber en caja (todos los cajeros): <strong id="caja-turno">CUP 0</strong></p>
 
                 <div class="border-t dark:border-slate-700 pt-4">
                     <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">📂 Ingresos por Categoría (CUP / USD)</h3>
-                    <div id="desglose-categorias-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+                    <div id="desglose-categorias-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+
+                <div class="border-t dark:border-slate-700 pt-4">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">👤 Ventas por Cajero</h3>
+                    <div id="desglose-cajeros" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+
+                <div class="border-t dark:border-slate-700 pt-4">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">💵 Arqueos cerrados en este turno</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
+                                <tr><th class="p-3">Hora</th><th class="p-3">Cajero</th><th class="p-3">Ventas</th><th class="p-3">Esperado</th><th class="p-3">Contado</th><th class="p-3">Resultado</th></tr>
+                            </thead>
+                            <tbody id="tabla-cortes" class="divide-y dark:divide-slate-700"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="flex justify-end pt-2">
-                    <button type="button" data-action="abrir-reporte-z" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs shadow">📊 Generar Reporte Z / Cerrar Turno</button>
+                    <button type="button" data-action="abrir-reporte-z" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-lg font-bold text-xs shadow">📊 Generar Reporte Z / Cerrar Turno</button>
+                </div>
+            </div>
+
+            <!-- Reporte de ventas -->
+            <div id="sec-semana" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-3">📅 Reporte de Ventas de la Semana</h2>
+                <div class="flex flex-wrap gap-2 items-center mb-4">
+                    <select id="semana-rango" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm">
+                        <option value="ultimos7">Últimos 7 días</option>
+                        <option value="semana">Esta semana (lunes a hoy)</option>
+                        <option value="pasada">Semana pasada</option>
+                    </select>
+                    <button type="button" data-action="generar-semana" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-3 rounded-lg font-bold shadow">Generar reporte</button>
+                </div>
+                <div id="semana-acciones" class="hidden flex flex-wrap gap-2 mb-4">
+                    <button type="button" data-action="imprimir" class="bg-slate-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold">🖨️ Imprimir</button>
+                    <button type="button" data-action="copiar-semana" class="bg-emerald-600 text-white text-xs px-3 py-2.5 rounded-lg font-bold">📋 Copiar</button>
+                    <button type="button" data-action="sms-semana" class="bg-blue-600 text-white text-xs px-3 py-2.5 rounded-lg font-bold">📩 SMS</button>
+                    <button type="button" data-action="csv-semana" class="bg-amber-600 text-white text-xs px-3 py-2.5 rounded-lg font-bold">📄 Excel (CSV)</button>
+                </div>
+                <div id="semana-resultado" class="zona-impresion zona-impresion-ancha text-slate-800 dark:text-slate-100">
+                    <p class="text-sm text-slate-400 italic">Elige el periodo y toca "Generar reporte".</p>
                 </div>
             </div>
 
             <!-- Cierres anteriores -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-2 border-amber-200 dark:border-amber-900">
-                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-4">🗂️ Turnos Cerrados (últimos 30)</h2>
-                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+            <div id="sec-cierres" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-4">🗂️ Turnos Cerrados (últimos 30 días)</h2>
+                <div class="overflow-x-auto max-h-72 overflow-y-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700 sticky top-0">
-                            <tr><th class="p-3">Cierre</th><th class="p-3">Tickets</th><th class="p-3">Ventas</th><th class="p-3">Neto</th><th class="p-3">Cerrado por</th></tr>
+                            <tr><th class="p-3">Cierre</th><th class="p-3">Tickets</th><th class="p-3">Ventas</th><th class="p-3">Neto</th><th class="p-3">Cerrado por</th><th class="p-3"></th></tr>
                         </thead>
                         <tbody id="tabla-cierres" class="divide-y dark:divide-slate-700"></tbody>
                     </table>
@@ -310,33 +386,48 @@
         </div>
     </main>
 
+    <!-- Barra del carrito (solo teléfono): total siempre a la vista -->
+    <div id="barra-carrito-movil" class="hidden fixed bottom-0 inset-x-0 z-40 lg:hidden bg-indigo-700 text-white px-4 py-3 flex justify-between items-center shadow-2xl no-print" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">
+        <div>
+            <p class="text-[11px] text-indigo-200" id="unidades-movil">0 productos</p>
+            <p class="font-extrabold" id="total-movil">$0.00 · 0 CUP</p>
+        </div>
+        <button type="button" data-action="ver-carrito" class="bg-white text-indigo-700 font-bold text-sm px-4 py-2.5 rounded-xl">🛒 Ver carrito y cobrar</button>
+    </div>
+
     <!-- ===================== MODALES ===================== -->
 
     <!-- Merma -->
     <div id="modal-merma" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
         <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <h3 class="text-lg font-bold">📉 Registrar Merma</h3>
-            <select id="merma-producto-select" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-sm"></select>
-            <input type="number" min="1" value="1" id="merma-cantidad" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-sm">
-            <select id="merma-motivo" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-sm">
+            <select id="merma-producto-select" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2.5 text-sm"></select>
+            <input type="number" min="1" value="1" id="merma-cantidad" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2.5 text-sm">
+            <select id="merma-motivo" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2.5 text-sm">
                 <option value="Roto / Dañado">Roto / Dañado</option>
                 <option value="Vencido">Vencido</option>
                 <option value="Consumo Interno">Consumo Interno</option>
             </select>
             <div class="flex space-x-3 pt-2">
-                <button type="button" data-action="cerrar-modal" data-modal="modal-merma" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cancelar</button>
-                <button type="button" data-action="guardar-merma" class="w-1/2 bg-red-600 text-white py-2 rounded text-xs font-bold">Registrar</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-merma" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cancelar</button>
+                <button type="button" data-action="guardar-merma" class="w-1/2 bg-red-600 text-white py-2.5 rounded-lg text-xs font-bold">Registrar</button>
             </div>
         </div>
     </div>
 
-    <!-- Arqueo de caja -->
+    <!-- Arqueo de caja (por cajero) -->
     <div id="modal-arqueo" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
             <h3 class="text-lg font-bold no-print">💵 Arqueo de Caja (CUP)</h3>
-            <p class="text-xs text-slate-500 no-print">Cuenta los billetes que hay en la gaveta y compáralos con lo que debería haber según las ventas en CUP.</p>
+            <p class="text-xs text-slate-500 no-print">Cuenta los billetes de TU gaveta. Solo se comparan con tus ventas desde tu último arqueo. Al cerrarlo, tu arqueo vuelve a empezar de cero.</p>
 
-            <div id="area-impresion-arqueo" class="zona-impresion overflow-x-auto">
+            <div id="area-impresion-arqueo" class="zona-impresion">
+                <div class="bg-indigo-50 dark:bg-indigo-950/40 rounded-lg p-3 text-xs mb-3">
+                    <div class="font-bold text-sm">👤 <span id="arqueo-cajero"></span></div>
+                    <div class="text-slate-500 dark:text-slate-400" id="arqueo-desde"></div>
+                </div>
+                <label for="arqueo-fondo" class="text-xs font-semibold">Fondo inicial en la gaveta (CUP, si lo hay):</label>
+                <input type="number" min="0" step="1" id="arqueo-fondo" data-input="arqueo" inputmode="numeric" placeholder="0" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2.5 text-sm mb-3 mt-1">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-100 dark:bg-slate-900 border-b dark:border-slate-700">
                         <tr>
@@ -351,19 +442,22 @@
                     <div class="flex justify-between"><span>Esperado en caja:</span><strong id="arqueo-esperado">0 CUP</strong></div>
                     <div class="flex justify-between"><span>Total contado:</span><strong id="arqueo-total-contado">0 CUP</strong></div>
                     <div class="flex justify-between"><span>Diferencia:</span><span id="arqueo-diferencia" class="font-extrabold">Cuadra ✅</span></div>
+                    <p id="arqueo-otros" class="text-[11px] text-slate-500"></p>
                 </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2 pt-2 no-print">
-                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2 rounded text-xs font-bold">🖨️ Imprimir Arqueo</button>
-                <button type="button" data-action="cerrar-modal" data-modal="modal-arqueo" class="bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cerrar</button>
+                <button type="button" data-action="limpiar-arqueo" class="bg-amber-100 text-amber-900 py-2.5 rounded-lg text-xs font-bold">🧹 Limpiar conteo</button>
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold">🖨️ Imprimir</button>
+                <button type="button" data-action="cerrar-arqueo" class="col-span-2 bg-emerald-600 text-white py-3 rounded-lg text-sm font-bold">✅ Cerrar mi arqueo y empezar de cero</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-arqueo" class="col-span-2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cerrar sin guardar</button>
             </div>
         </div>
     </div>
 
     <!-- Reporte Z -->
     <div id="modal-reportez" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             <h3 class="text-base font-bold text-center no-print">📊 Cierre de Caja y Stock (Reporte Z)</h3>
             <div id="area-impresion-reportez" class="zona-impresion recibo">
                 <div class="centro negrita" style="font-size:12px;">PUNTO 3 M - REPORTE Z</div>
@@ -375,20 +469,39 @@
                 <div class="fila"><span>CUP:</span><span id="rz-cup"></span></div>
                 <div class="linea"></div>
                 <div class="fila"><span>Tickets:</span><span id="rz-tickets"></span></div>
-                <div class="fila"><span>Ventas totales:</span><span id="rz-ventas"></span></div>
-                <div class="fila"><span>Mermas/Gastos:</span><span id="rz-gastos"></span></div>
+                <div class="fila"><span>Ventas:</span><span id="rz-ventas"></span></div>
+                <div class="fila"><span>Mermas:</span><span id="rz-gastos"></span></div>
                 <div class="fila negrita"><span>GANANCIA NETA:</span><span id="rz-neto"></span></div>
+                <div class="linea"></div>
+                <div class="negrita">POR CAJERO:</div>
+                <div id="rz-cajeros"></div>
                 <div class="linea"></div>
                 <div class="negrita">CUADRE INVENTARIO (Ini->Fin):</div>
                 <div id="rz-cuadre-inventario" style="margin-top:4px;"></div>
                 <div class="linea"></div>
                 <div class="centro">Fin de Turno</div>
             </div>
+            <label class="flex items-start gap-2 text-xs no-print bg-indigo-50 dark:bg-indigo-950/40 rounded-lg p-3">
+                <input type="checkbox" id="rz-respaldo" checked class="mt-0.5">
+                <span><strong>Descargar un respaldo antes de cerrar</strong> (recomendado). Se guarda un archivo .json en tu teléfono.</span>
+            </label>
             <div class="grid grid-cols-2 gap-2 no-print">
-                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2 rounded text-xs font-bold">🖨️ Imprimir Z</button>
-                <button type="button" data-action="reiniciar-turno" class="bg-red-600 text-white py-2 rounded text-xs font-bold">🔄 Cerrar Turno</button>
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold">🖨️ Imprimir Z</button>
+                <button type="button" data-action="exportar-respaldo" class="bg-slate-700 text-white py-2.5 rounded-lg text-xs font-bold">💾 Respaldo ahora</button>
+                <button type="button" data-action="reiniciar-turno" class="col-span-2 bg-red-600 text-white py-3 rounded-lg text-sm font-bold">🔄 Cerrar Turno</button>
             </div>
-            <button type="button" data-action="cerrar-modal" data-modal="modal-reportez" class="w-full bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs no-print">Cerrar</button>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-reportez" class="w-full bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs no-print">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Detalle de un turno cerrado -->
+    <div id="modal-cierre" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div id="cierre-detalle" class="zona-impresion recibo"></div>
+            <div class="grid grid-cols-2 gap-2 no-print">
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold">🖨️ Imprimir</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-cierre" class="bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cerrar</button>
+            </div>
         </div>
     </div>
 
@@ -396,9 +509,10 @@
     <div id="modal-seleccion-cajero" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
         <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <h3 class="text-lg font-bold">👥 Seleccionar Cajero Activo</h3>
-            <div id="lista-modal-cajeros" class="space-y-2 max-h-48 overflow-y-auto"></div>
-            <button type="button" id="btn-quitar-cajero" data-action="quitar-cajero" class="hidden w-full bg-amber-100 text-amber-900 py-2 rounded text-xs font-bold">Salir de mi turno de caja</button>
-            <button type="button" data-action="cerrar-modal" data-modal="modal-seleccion-cajero" class="w-full bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cancelar</button>
+            <div id="lista-modal-cajeros" class="space-y-2 max-h-56 overflow-y-auto"></div>
+            <p class="text-[11px] text-slate-500">🔑 = cambiar tu propio PIN.</p>
+            <button type="button" id="btn-quitar-cajero" data-action="quitar-cajero" class="hidden w-full bg-amber-100 text-amber-900 py-2.5 rounded-lg text-xs font-bold">Salir de mi turno de caja</button>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-seleccion-cajero" class="w-full bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cancelar</button>
         </div>
     </div>
 
@@ -425,7 +539,7 @@
 
     <!-- Ticket -->
     <div id="modal-ticket" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-xs w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-xs w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
             <div id="area-impresion-ticket" class="zona-impresion recibo">
                 <div class="centro negrita" style="font-size:12px;">PUNTO 3 M</div>
                 <div class="centro">Gestor de Negocio</div>
@@ -441,61 +555,123 @@
                 <div class="centro">¡Gracias por su compra!</div>
             </div>
             <div class="grid grid-cols-2 gap-2 mt-4 no-print">
-                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2 rounded text-xs font-bold">🖨️ Imprimir</button>
-                <button type="button" data-action="copiar-ticket" class="bg-emerald-600 text-white py-2 rounded text-xs font-bold">📋 Copiar</button>
+                <button type="button" data-action="imprimir" class="bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold">🖨️ Imprimir</button>
+                <button type="button" data-action="copiar-ticket" class="bg-emerald-600 text-white py-2.5 rounded-lg text-xs font-bold">📋 Copiar</button>
             </div>
-            <button type="button" data-action="cerrar-modal" data-modal="modal-ticket" class="w-full mt-2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs no-print">Cerrar</button>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-ticket" class="w-full mt-2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs no-print">Cerrar</button>
         </div>
     </div>
 
-    <!-- Tasa de cambio -->
+    <!-- Tasas y ajustes -->
     <div id="modal-tasa" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
-        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
-            <h3 class="text-lg font-bold">⚙️ Actualizar Tasa de Cambio</h3>
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl max-h-[92vh] overflow-y-auto">
+            <h3 class="text-lg font-bold">⚙️ Tasas y ajustes</h3>
             <div>
                 <label for="input-tasa-usd" class="text-xs font-bold text-indigo-600 dark:text-indigo-400">Tasa USD (en CUP):</label>
-                <input type="number" step="0.01" min="0" id="input-tasa-usd" class="w-full border dark:border-slate-700 rounded p-2 text-sm mt-1 dark:bg-slate-900">
+                <input type="number" step="0.01" min="0" id="input-tasa-usd" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm mt-1 dark:bg-slate-900">
             </div>
             <div>
                 <label for="input-tasa-mlc" class="text-xs font-bold text-blue-600 dark:text-blue-400">Tasa MLC (en CUP):</label>
-                <input type="number" step="0.01" min="0" id="input-tasa-mlc" class="w-full border dark:border-slate-700 rounded p-2 text-sm mt-1 dark:bg-slate-900">
+                <input type="number" step="0.01" min="0" id="input-tasa-mlc" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm mt-1 dark:bg-slate-900">
+            </div>
+            <div>
+                <label for="input-telefono" class="text-xs font-bold text-slate-600 dark:text-slate-300">Teléfono para el reporte por SMS:</label>
+                <input type="tel" id="input-telefono" placeholder="+5353463594" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm mt-1 dark:bg-slate-900">
             </div>
             <div class="flex space-x-2 pt-2">
-                <button type="button" data-action="cerrar-modal" data-modal="modal-tasa" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs">Cancelar</button>
-                <button type="button" data-action="guardar-tasa" class="w-1/2 bg-indigo-600 text-white py-2 rounded text-xs font-bold">Guardar Tasas</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-tasa" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cancelar</button>
+                <button type="button" data-action="guardar-tasa" class="w-1/2 bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold">Guardar</button>
             </div>
         </div>
     </div>
 
     <!-- Producto (nuevo / editar) -->
     <div id="modal-producto" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
-        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-6 space-y-3 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold" id="producto-modal-titulo">📦 Nuevo Producto</h3>
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-5 sm:p-6 space-y-3 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold" id="producto-modal-titulo">📦 Nuevo Producto</h3>
+                <button type="button" data-action="limpiar-producto" class="text-xs bg-amber-100 text-amber-900 px-3 py-1.5 rounded-lg font-semibold">🧹 Limpiar</button>
+            </div>
             <input type="hidden" id="nuevo-id">
-            <input type="text" id="nuevo-nombre" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Nombre del producto">
-            <input type="text" id="nuevo-codigo" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Código de barras (opcional)">
-            <select id="nuevo-categoria" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900"></select>
+
+            <div class="flex items-center gap-3">
+                <div class="w-24 h-24 rounded-xl border dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
+                    <img id="foto-preview" alt="Foto del producto" class="hidden w-full h-full object-cover">
+                    <span id="foto-vacia" class="text-3xl">📷</span>
+                </div>
+                <div class="flex flex-col gap-2 text-xs flex-1">
+                    <label class="bg-indigo-600 text-white px-3 py-2.5 rounded-lg font-bold cursor-pointer text-center">📸 Tomar foto
+                        <input type="file" id="input-foto-camara" accept="image/*" capture="environment" class="hidden">
+                    </label>
+                    <label class="bg-slate-200 dark:bg-slate-700 px-3 py-2.5 rounded-lg font-bold cursor-pointer text-center">🖼️ Elegir de la galería
+                        <input type="file" id="input-foto-galeria" accept="image/*" class="hidden">
+                    </label>
+                    <button type="button" id="btn-quitar-foto" data-action="quitar-foto" class="hidden bg-red-100 text-red-700 px-3 py-2 rounded-lg font-bold">Quitar foto</button>
+                </div>
+            </div>
+
+            <input type="text" id="nuevo-nombre" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="Nombre del producto (ej.: Refresco)">
+            <input type="text" id="nuevo-variante" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="Sabor / tipo (opcional, ej.: Naranja)">
+            <div class="flex gap-2">
+                <input type="text" id="nuevo-codigo" class="flex-1 min-w-0 border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="Código de barras (opcional)" inputmode="numeric">
+                <button type="button" data-action="escanear-codigo-producto" class="bg-indigo-600 text-white rounded-lg px-4 text-lg" aria-label="Escanear código con la cámara">📷</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label for="nuevo-categoria" class="text-[10px] text-slate-500">Categoría:</label>
+                    <select id="nuevo-categoria" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900"></select>
+                </div>
+                <div>
+                    <label for="nuevo-subcategoria" class="text-[10px] text-slate-500">Subcategoría:</label>
+                    <select id="nuevo-subcategoria" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900"></select>
+                </div>
+            </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label for="nuevo-moneda-base" class="text-[10px] text-slate-500">Moneda del precio:</label>
-                    <select id="nuevo-moneda-base" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900">
+                    <select id="nuevo-moneda-base" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900">
                         <option value="USD">USD ($)</option>
                         <option value="CUP">CUP (pesos)</option>
                     </select>
                 </div>
                 <div>
-                    <label for="input-precio-base" class="text-[10px] text-slate-500">Precio:</label>
-                    <input type="number" step="0.01" min="0" id="input-precio-base" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Precio" inputmode="decimal">
+                    <label for="input-precio-base" class="text-[10px] text-slate-500">Precio de venta:</label>
+                    <input type="number" step="0.01" min="0" id="input-precio-base" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="Precio" inputmode="decimal">
                 </div>
             </div>
-            <input type="number" step="0.01" min="0" id="nuevo-costo" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Costo en USD" inputmode="decimal">
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label for="nuevo-costo-moneda" class="text-[10px] text-slate-500">Moneda del costo:</label>
+                    <select id="nuevo-costo-moneda" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900">
+                        <option value="USD">USD ($)</option>
+                        <option value="CUP">CUP (pesos)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="nuevo-costo" class="text-[10px] text-slate-500">Costo:</label>
+                    <input type="number" step="0.01" min="0" id="nuevo-costo" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="Costo" inputmode="decimal">
+                </div>
+            </div>
             <div id="grupo-stock-inicial">
-                <input type="number" min="0" id="nuevo-stock" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="Stock inicial" inputmode="numeric">
+                <input type="number" min="0" id="nuevo-stock" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="Stock inicial" inputmode="numeric">
             </div>
             <div class="flex space-x-2 pt-2">
-                <button type="button" data-action="cerrar-modal" data-modal="modal-producto" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs font-semibold">Cancelar</button>
-                <button type="button" data-action="guardar-producto" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-xs font-bold">Guardar Producto</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-producto" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-3 rounded-lg text-xs font-semibold">Cancelar</button>
+                <button type="button" data-action="guardar-producto" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg text-xs font-bold">Guardar Producto</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Escáner de código de barras (cámara) -->
+    <div id="modal-escaner" class="modal-overlay fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[65] no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-4 space-y-3 shadow-2xl">
+            <h3 class="text-lg font-bold">📷 Escanear código</h3>
+            <div class="relative rounded-lg overflow-hidden bg-black aspect-[4/3]">
+                <video id="escaner-video" class="w-full h-full object-cover" playsinline muted autoplay></video>
+                <div class="absolute inset-x-6 top-1/2 h-0.5 bg-red-500/80 pointer-events-none"></div>
+            </div>
+            <p id="escaner-mensaje" class="text-xs text-slate-600 dark:text-slate-300 min-h-[2.5rem]"></p>
+            <button type="button" data-action="cerrar-escaner" class="w-full bg-slate-700 text-white py-3 rounded-lg text-sm font-bold">Cerrar cámara</button>
         </div>
     </div>
 
@@ -504,13 +680,40 @@
         <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-3 shadow-2xl">
             <h3 class="text-lg font-bold" id="empleado-modal-titulo">👤 Nuevo Trabajador</h3>
             <input type="hidden" id="empleado-id">
-            <input type="text" id="empleado-nombre" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900 disabled:opacity-60" placeholder="Nombre">
-            <input type="password" id="empleado-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" class="w-full border dark:border-slate-700 rounded p-2 text-sm dark:bg-slate-900" placeholder="PIN (4 a 8 dígitos)">
+            <input type="text" id="empleado-nombre" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900 disabled:opacity-60" placeholder="Nombre">
+            <input type="password" id="empleado-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="PIN (4 a 8 dígitos)">
             <p id="empleado-error" class="hidden text-xs text-red-600 font-semibold"></p>
             <div class="flex space-x-2 pt-2">
-                <button type="button" data-action="cerrar-modal" data-modal="modal-empleado" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded text-xs font-semibold">Cancelar</button>
-                <button type="button" data-action="guardar-empleado" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-xs font-bold">Guardar</button>
+                <button type="button" data-action="cerrar-modal" data-modal="modal-empleado" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs font-semibold">Cancelar</button>
+                <button type="button" data-action="guardar-empleado" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-xs font-bold">Guardar</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Mi cuenta -->
+    <div id="modal-cuenta" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
+        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-3 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <h3 class="text-lg font-bold">👤 Mi cuenta</h3>
+            <div class="text-xs bg-slate-50 dark:bg-slate-900/60 border dark:border-slate-700 rounded-lg p-3">
+                <div class="font-semibold break-all" id="cuenta-correo"></div>
+                <div class="text-slate-500" id="cuenta-rol"></div>
+            </div>
+
+            <h4 class="text-sm font-bold pt-1">Cambiar contraseña</h4>
+            <input type="password" id="cuenta-actual" autocomplete="current-password" placeholder="Contraseña actual" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900">
+            <input type="password" id="cuenta-nueva" autocomplete="new-password" placeholder="Contraseña nueva (mínimo 8)" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900">
+            <input type="password" id="cuenta-repetir" autocomplete="new-password" placeholder="Repite la contraseña nueva" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900">
+            <p id="cuenta-error" class="hidden text-xs text-red-600 font-semibold"></p>
+            <button type="button" id="btn-guardar-password" data-action="guardar-password" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-xs font-bold">Guardar contraseña nueva</button>
+            <button type="button" data-action="correo-recuperacion" class="w-full bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs font-semibold">✉️ Olvidé mi contraseña: enviarme un correo</button>
+
+            <h4 class="text-sm font-bold pt-2">En este teléfono</h4>
+            <button type="button" id="btn-avisos" data-action="alternar-avisos" class="w-full bg-amber-100 text-amber-900 py-2.5 rounded-lg text-xs font-bold"></button>
+            <div id="cuenta-instalar" class="hidden">
+                <button type="button" data-action="instalar-app" class="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-xs font-bold">📲 Instalar como app</button>
+            </div>
+            <button type="button" data-action="buscar-actualizacion" class="w-full bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs font-semibold">🔄 Buscar actualización de la app</button>
+            <button type="button" data-action="cerrar-modal" data-modal="modal-cuenta" class="w-full bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cerrar</button>
         </div>
     </div>
 
@@ -521,14 +724,14 @@
             <p id="dialogo-texto" class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line"></p>
             <input type="text" id="dialogo-input" class="hidden w-full border-2 border-indigo-300 dark:border-indigo-800 dark:bg-slate-900 rounded-lg p-3 text-lg font-bold text-center">
             <div class="flex space-x-3">
-                <button type="button" id="dialogo-cancelar" data-action="dialogo-cancelar" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2 rounded-lg text-sm">Cancelar</button>
-                <button type="button" id="dialogo-ok" data-action="dialogo-ok" class="w-1/2 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">Aceptar</button>
+                <button type="button" id="dialogo-cancelar" data-action="dialogo-cancelar" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-sm">Cancelar</button>
+                <button type="button" id="dialogo-ok" data-action="dialogo-ok" class="w-1/2 bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-bold">Aceptar</button>
             </div>
         </div>
     </div>
 
     <!-- Avisos -->
-    <div id="toasts" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[80] space-y-2 pointer-events-none no-print"></div>
+    <div id="toasts" class="fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-[80] space-y-2 pointer-events-none no-print w-[92vw] max-w-md"></div>
 
     <script type="module" src="main.js"></script>
 </body>
