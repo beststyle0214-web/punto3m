@@ -271,6 +271,100 @@ export function renderCierres() {
     : '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">No hay turnos cerrados en los últimos 30 días.</td></tr>';
 }
 
+// ------------------------------------------------------------- mercancía: entregada vs. lo que queda
+
+/** Por producto: lo entregado al abrir el turno, lo vendido, la merma y lo que queda. */
+export function cuadreMercancia() {
+  const vendido = new Map();
+  estado.ventas.forEach((v) => (v.items || []).forEach((i) => vendido.set(i.id, (vendido.get(i.id) || 0) + (Number(i.cantidad) || 0))));
+  const merma = new Map();
+  estado.mermas.forEach((m) => merma.set(m.productoId, (merma.get(m.productoId) || 0) + (Number(m.cantidad) || 0)));
+  const filas = estado.productos
+    .map((p) => {
+      const v = vendido.get(p.id) || 0;
+      const m = merma.get(p.id) || 0;
+      return {
+        id: p.id,
+        nombre: nombreProducto(p),
+        entregado: p.stockInicial,
+        vendido: v,
+        merma: m,
+        queda: p.stock,
+        // positivo = faltan unidades sin explicar; negativo = sobran (p. ej. se corrigió el stock a mano)
+        sinExplicar: p.stockInicial - v - m - p.stock,
+      };
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const total = filas.reduce(
+    (t, f) => ({ entregado: t.entregado + f.entregado, vendido: t.vendido + f.vendido, merma: t.merma + f.merma, queda: t.queda + f.queda }),
+    { entregado: 0, vendido: 0, merma: 0, queda: 0 },
+  );
+  return { filas, total };
+}
+
+function tarjetasMercancia(t) {
+  const caja = (titulo, valor, color) =>
+    `<div class="rounded-xl border dark:border-slate-700 p-2.5 ${color}"><p class="text-[11px] font-medium">${titulo}</p><p class="text-xl font-extrabold">${valor}</p></div>`;
+  return (
+    caja('Entregado', t.entregado, 'bg-indigo-50 dark:bg-indigo-950/40') +
+    caja('Vendido', t.vendido + t.merma, 'bg-amber-50 dark:bg-amber-950/40') +
+    caja('Queda', t.queda, 'bg-emerald-50 dark:bg-emerald-950/40')
+  );
+}
+
+export function renderMercancia() {
+  const { filas, total } = cuadreMercancia();
+  const html = tarjetasMercancia(total);
+  $('merc-resumen').innerHTML = html;
+  $('merc-resumen-detalle').innerHTML = html;
+  $('tabla-mercancia').innerHTML = filas.length
+    ? filas
+        .map((f) => {
+          const dif = f.sinExplicar
+            ? `<span class="font-bold ${f.sinExplicar > 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}">${f.sinExplicar > 0 ? '−' : '+'}${Math.abs(f.sinExplicar)}</span>`
+            : '<span class="text-slate-400">—</span>';
+          return `<tr>
+            <td class="p-3 font-semibold">${esc(f.nombre)}</td>
+            <td class="p-3">${f.entregado}</td>
+            <td class="p-3">${f.vendido}</td>
+            <td class="p-3">${f.merma || '—'}</td>
+            <td class="p-3 font-bold ${f.queda <= 0 ? 'text-red-600 dark:text-red-400' : ''}">${f.queda}</td>
+            <td class="p-3">${dif}</td></tr>`;
+        })
+        .join('')
+    : '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Aún no hay productos.</td></tr>';
+}
+
+async function copiarMercancia() {
+  const { filas, total } = cuadreMercancia();
+  const lineas = [
+    `MERCANCÍA DEL TURNO`,
+    `Entregado: ${total.entregado} · Vendido: ${total.vendido} · Merma: ${total.merma} · Queda: ${total.queda}`,
+    '',
+    ...filas.map(
+      (f) => `${f.nombre}: entregado ${f.entregado} · vendido ${f.vendido}${f.merma ? ` · merma ${f.merma}` : ''} · queda ${f.queda}${f.sinExplicar ? ` · sin explicar ${f.sinExplicar > 0 ? '-' : '+'}${Math.abs(f.sinExplicar)}` : ''}`,
+    ),
+  ];
+  try {
+    await navigator.clipboard.writeText(lineas.join('\n'));
+    toast('📋 Cuadre copiado');
+  } catch (e) {
+    avisar(lineas.join('\n'), 'Mercancía del turno');
+  }
+}
+
+/** En el teléfono las tablas se ven como tarjetas: cada celda lleva el título de su columna. */
+export function etiquetarTablas() {
+  document.querySelectorAll('table.tabla-movil').forEach((t) => {
+    const titulos = [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+    t.querySelectorAll('tbody tr').forEach((tr) => {
+      [...tr.children].forEach((td, i) => {
+        td.dataset.label = td.colSpan > 1 ? '' : titulos[i] || '';
+      });
+    });
+  });
+}
+
 export function renderAdmin() {
   renderStockCritico();
   renderChipsCategorias();
@@ -281,6 +375,8 @@ export function renderAdmin() {
   renderFinanciero();
   renderCortes();
   renderCierres();
+  renderMercancia();
+  etiquetarTablas();
 }
 
 // ------------------------------------------------------------- categorías y subcategorías
@@ -919,6 +1015,7 @@ export const accionesAdmin = {
   'eliminar-producto': (d) => eliminarProducto(d.id),
   'abrir-tasa': abrirModalTasa,
   'guardar-tasa': guardarTasa,
+  'copiar-mercancia': copiarMercancia,
   'aprobar-empleado': (d) => aprobarEmpleado(d.id),
   'pin-empleado': (d) => reiniciarPinEmpleado(d.id),
   'turno-empleado': (d) => alternarTurno(d.id),

@@ -96,7 +96,7 @@ const iconoCategoria = (cat) => {
 };
 
 export function renderCategorias() {
-  const botones = [['*', 'Todos'], ...estado.categorias.map((c) => [c, c])];
+  const botones = [['#ocultar', '🙈 Ocultar'], ['*', 'Todos'], ...estado.categorias.map((c) => [c, c])];
   const chip = (accion, atributo, valor, texto, activo) =>
     `<button type="button" data-action="${accion}" data-${atributo}="${esc(valor)}"
       class="px-3 py-2 rounded-lg text-xs font-semibold ${activo ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700'}">${esc(texto)}</button>`;
@@ -105,7 +105,7 @@ export function renderCategorias() {
     .map(([valor, texto]) => chip('filtrar-categoria', 'cat', valor, texto, valor === estado.categoriaFiltro))
     .join('');
 
-  const subs = estado.categoriaFiltro === '*' ? [] : subcategoriasDe(estado.categoriaFiltro);
+  const subs = ['*', '#ocultar'].includes(estado.categoriaFiltro) ? [] : subcategoriasDe(estado.categoriaFiltro);
   if (estado.subFiltro !== '*' && !subs.includes(estado.subFiltro)) estado.subFiltro = '*';
   const caja = $('botones-subcategorias');
   caja.classList.toggle('hidden', !subs.length);
@@ -135,6 +135,12 @@ function tarjetaProducto(p) {
 }
 
 export function renderGrid() {
+  // "Ocultar": deja la pantalla limpia (se sigue vendiendo con la búsqueda o la cámara).
+  if (estado.categoriaFiltro === '#ocultar') {
+    $('product-grid').innerHTML =
+      '<p class="col-span-full text-sm text-slate-400 italic text-center py-6">🙈 Productos ocultos. Busca por nombre, escanea el código o elige una categoría para verlos.</p>';
+    return;
+  }
   let lista = estado.productos;
   if (estado.categoriaFiltro !== '*') lista = lista.filter((p) => p.categoria === estado.categoriaFiltro);
   if (estado.subFiltro !== '*') lista = lista.filter((p) => p.subcategoria === estado.subFiltro);

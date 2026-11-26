@@ -127,7 +127,16 @@ export function escucharPerfil(uid, cambio, error) {
   if (bajaPerfil) bajaPerfil();
   bajaPerfil = col('empleados')
     .doc(uid)
-    .onSnapshot((s) => cambio(s.exists ? mapearEmpleado(s.id, s.data()) : null), error);
+    .onSnapshot(
+      { includeMetadataChanges: true },
+      (s) => {
+        const perfil = s.exists ? mapearEmpleado(s.id, s.data()) : null;
+        // enviando = la solicitud sigue solo en este teléfono, todavía no llegó al dueño
+        if (perfil) perfil.enviando = s.metadata.hasPendingWrites;
+        cambio(perfil);
+      },
+      error,
+    );
 }
 
 function escucharTurno(turnoId, cambio, error) {

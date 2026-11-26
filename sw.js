@@ -6,7 +6,7 @@
 //  - Avisos: muestra las notificaciones y, al tocarlas, abre la app.
 // Al cambiar archivos de la app, sube VERSION para limpiar copias viejas.
 
-const VERSION = 'p3m-v5';
+const VERSION = 'p3m-v6';
 const ARCHIVOS = [
   './',
   'index.html',

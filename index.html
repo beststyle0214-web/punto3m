@@ -10,11 +10,12 @@
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
 
-    <!-- Evita el parpadeo blanco: aplica el modo oscuro antes de dibujar -->
+    <!-- Evita el parpadeo blanco: aplica el tema (automático / claro / oscuro) antes de dibujar -->
     <script>
         try {
-            var g = localStorage.getItem('modoOscuro');
-            if (g === '1' || (g === null && matchMedia('(prefers-color-scheme: dark)').matches)) {
+            var t = localStorage.getItem('tema');
+            if (t === null) { var g = localStorage.getItem('modoOscuro'); t = g === '1' ? 'oscuro' : g === '0' ? 'claro' : 'auto'; }
+            if (t === 'oscuro' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.classList.add('dark');
             }
         } catch (e) {}
@@ -82,27 +83,46 @@
     </div>
 
     <!-- Encabezado -->
-    <header class="bg-indigo-600 dark:bg-indigo-900 text-white shadow-md no-print">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
-            <div>
-                <h1 class="text-2xl font-bold">Punto 3 M 🚀</h1>
-                <p class="text-xs text-indigo-200"><span id="badge-usuario">Sin sesión</span> · <span id="badge-conexion">🟢 En línea</span>
+    <header class="sticky top-0 z-40 bg-indigo-600 dark:bg-slate-950 text-white shadow-md no-print" style="padding-top: env(safe-area-inset-top);">
+        <div class="max-w-7xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+                <h1 class="text-lg font-bold leading-tight truncate">Punto 3 M 🚀</h1>
+                <p class="text-[11px] text-indigo-200 truncate"><span id="badge-usuario">Sin sesión</span> · <span id="badge-conexion">🟢 En línea</span>
                     <span id="badge-pendientes" class="hidden ml-1 bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full font-bold"></span></p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <span id="badge-rol" class="text-xs bg-indigo-500 dark:bg-indigo-700 px-3 py-1.5 rounded-full font-medium">Cajero: Ninguno</span>
-                <button type="button" id="btn-instalar" data-action="instalar-app" class="hidden bg-emerald-500 hover:bg-emerald-600 text-xs px-3 py-2 rounded-lg font-semibold">📲 Instalar</button>
-                <button type="button" id="btn-dark-mode" data-action="modo-oscuro" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold" aria-label="Cambiar modo oscuro">🌙</button>
-                <button type="button" data-action="abrir-cajeros" class="bg-blue-600 hover:bg-blue-700 text-xs px-3 py-2 rounded-lg font-semibold shadow">👥 Mi caja</button>
-                <button type="button" id="btn-cambiar-modo" data-action="acceso-dueno" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">🔒 Dueño</button>
-                <button type="button" data-action="abrir-cuenta" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">👤 Cuenta</button>
-                <button type="button" data-action="cerrar-sesion" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">Salir</button>
+            <div class="flex items-center gap-2 shrink-0">
+                <span id="badge-rol" class="hidden sm:inline-block text-xs bg-indigo-500 dark:bg-slate-800 px-3 py-1.5 rounded-full font-medium">Cajero: Ninguno</span>
+                <button type="button" id="btn-menu" data-action="abrir-menu" class="relative bg-white/15 hover:bg-white/25 rounded-xl px-3.5 py-2 text-base font-bold" aria-label="Abrir menú">☰
+                    <span id="punto-menu" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] leading-[18px] text-center font-bold">0</span></button>
             </div>
         </div>
     </header>
 
+    <!-- Menú (todo lo que no hace falta ver siempre) -->
+    <div id="menu-principal" class="fixed inset-0 z-[45] hidden no-print" role="dialog" aria-label="Menú">
+        <div data-action="cerrar-menu" class="absolute inset-0 bg-black/50"></div>
+        <aside class="absolute right-0 top-0 bottom-0 w-[86%] max-w-xs bg-white dark:bg-slate-800 shadow-2xl p-4 overflow-y-auto space-y-2" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom));">
+            <div class="flex justify-between items-center">
+                <h2 class="font-bold text-lg">Menú</h2>
+                <button type="button" data-action="cerrar-menu" class="text-xl px-2 text-slate-500" aria-label="Cerrar menú">✕</button>
+            </div>
+            <p id="menu-usuario" class="text-xs text-slate-500 dark:text-slate-400 break-all pb-1"></p>
+            <p class="menu-titulo">Mi caja</p>
+            <button type="button" data-action="abrir-cajeros" class="menu-item">👥 Mi caja y mi PIN</button>
+            <button type="button" data-action="abrir-arqueo" class="menu-item">💵 Arqueo de caja</button>
+            <button type="button" data-action="sms-reporte" class="menu-item">📩 Reporte por SMS</button>
+            <p class="menu-titulo">Cuenta y app</p>
+            <button type="button" id="btn-cambiar-modo" data-action="acceso-dueno" class="menu-item"><span id="txt-modo-dueno">🔒 Dueño</span>
+                <span id="badge-solicitudes" class="hidden ml-1 bg-red-500 text-white text-[11px] rounded-full px-2 py-0.5 font-bold"></span></button>
+            <button type="button" data-action="abrir-cuenta" class="menu-item">👤 Mi cuenta y contraseña</button>
+            <button type="button" id="btn-dark-mode" data-action="modo-oscuro" class="menu-item">🌓 Tema: Automático</button>
+            <button type="button" id="btn-instalar" data-action="instalar-app" class="hidden menu-item">📲 Instalar la app</button>
+            <button type="button" data-action="cerrar-sesion" class="menu-item text-red-600 dark:text-red-400">🚪 Cerrar sesión</button>
+        </aside>
+    </div>
+
     <!-- Tasas y cajero activo -->
-    <div class="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/50 py-2 px-4 text-xs text-amber-800 dark:text-amber-300 font-medium no-print">
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/50 py-1.5 px-3 text-[11px] sm:text-xs text-amber-800 dark:text-amber-300 font-medium no-print">
         <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
             <span>💱 Tasa del día: <strong>USD: <span id="lbl-tasa-usd">320</span> CUP</strong> | <strong>MLC: <span id="lbl-tasa-mlc">280</span> CUP</strong></span>
             <span id="barra-estado-cajero-activo" class="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 px-2.5 py-0.5 rounded-full font-bold">⚪ Cajero: Ninguno</span>
@@ -115,14 +135,11 @@
         <div id="vista-pos" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <section class="lg:col-span-2 space-y-6">
                 <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6">
-                    <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                        <h2 class="text-xl font-semibold text-indigo-600 dark:text-indigo-400">Registrar Venta</h2>
-                        <div class="flex flex-wrap gap-2">
-                            <button type="button" data-action="sms-reporte" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">📩 Reporte por SMS</button>
-                            <button type="button" data-action="abrir-arqueo" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">💵 Arqueo de Caja</button>
-                        </div>
+                    <div class="flex justify-between items-center mb-3 gap-2">
+                        <h2 class="text-lg font-bold text-indigo-600 dark:text-indigo-400">Registrar venta</h2>
+                        <span class="text-[11px] text-slate-400">Más opciones en ☰</span>
                     </div>
-                    <div class="flex flex-wrap gap-1.5 text-xs mb-2" id="botones-categorias"></div>
+                    <div class="flex gap-1.5 text-xs mb-2 overflow-x-auto pb-1 -mx-1 px-1" id="botones-categorias"></div>
                     <div class="flex flex-wrap gap-1.5 text-xs mb-4 hidden" id="botones-subcategorias"></div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -177,46 +194,60 @@
         </div>
 
         <!-- PANEL DE ADMINISTRACIÓN (solo dueño) -->
-        <div id="panel-gestion-dueno" class="space-y-6 hidden">
+        <div id="panel-gestion-dueno" class="space-y-4 hidden">
 
-            <div class="bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 p-4 rounded-xl flex flex-wrap justify-between items-center gap-3">
-                <div>
-                    <h3 class="font-bold text-amber-900 dark:text-amber-200 text-sm">🛠️ Panel de Administración</h3>
-                    <p class="text-xs text-amber-700 dark:text-amber-400">Inventario, turnos, cierres y respaldos. Los datos se sincronizan con la nube cuando hay internet.</p>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" data-action="importar-antiguo" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow">⬆️ Importar datos anteriores</button>
-                    <button type="button" data-action="exportar-respaldo" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow">💾 Exportar Respaldo</button>
-                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow cursor-pointer">
-                        📂 Restaurar Datos
-                        <input type="file" id="input-importar" accept=".json,application/json" class="hidden">
-                    </label>
-                    <button type="button" data-action="cerrar-modo-dueno" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold shadow">🔒 Cerrar Modo Dueño</button>
-                </div>
+            <div class="flex items-center justify-between gap-2">
+                <h2 id="titulo-pestana-dueno" class="text-xl font-extrabold text-indigo-700 dark:text-indigo-300">📊 Resumen</h2>
+                <button type="button" data-action="cerrar-modo-dueno" class="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold shadow">🔓 Salir del panel</button>
             </div>
 
-            <!-- Atajos a cada sección -->
-            <nav class="sticky top-0 z-30 -mx-4 px-4 py-2 bg-slate-100/95 dark:bg-slate-900/95 backdrop-blur overflow-x-auto whitespace-nowrap text-xs font-semibold space-x-2" aria-label="Secciones del panel">
-                <a href="#sec-alertas" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">🚨 Alertas</a>
-                <a href="#sec-inventario" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📦 Inventario</a>
-                <a href="#sec-categorias" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📁 Categorías</a>
-                <a href="#sec-personal" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">👥 Personal</a>
-                <a href="#sec-historial" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📋 Tickets</a>
-                <a href="#sec-financiero" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📊 Finanzas</a>
-                <a href="#sec-semana" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">📅 Reportes</a>
-                <a href="#sec-cierres" class="inline-block bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full px-3 py-1.5">🗂️ Cierres</a>
-            </nav>
+            <!-- ============ 1. RESUMEN ============ -->
+            <div data-pestana="resumen" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-indigo-50 dark:bg-indigo-950/40 p-4 rounded-xl border dark:border-slate-700">
+                        <p class="text-xs text-indigo-600 dark:text-indigo-300 font-medium">Ventas totales</p>
+                        <p class="text-2xl font-extrabold mt-1" id="ventas-dia">$0.00 USD</p>
+                        <p class="text-sm font-bold text-indigo-700 dark:text-indigo-300" id="ventas-dia-cup">0 CUP</p>
+                    </div>
+                    <div class="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl border dark:border-slate-700">
+                        <p class="text-xs text-amber-600 dark:text-amber-300 font-medium">Gastos / mermas</p>
+                        <p class="text-2xl font-extrabold mt-1" id="gastos-dia">$0.00 USD</p>
+                        <p class="text-sm font-bold text-amber-700 dark:text-amber-300" id="gastos-dia-cup">0 CUP</p>
+                    </div>
+                    <div class="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-xl border dark:border-slate-700">
+                        <p class="text-xs text-emerald-600 dark:text-emerald-300 font-medium">Ganancia neta</p>
+                        <p class="text-2xl font-extrabold mt-1" id="ganancia-neta-dia">$0.00 USD</p>
+                        <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300" id="ganancia-neta-dia-cup">0 CUP</p>
+                    </div>
+                </div>
+                <p class="text-xs bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl p-3">💵 Efectivo que debe haber en caja (todos los cajeros): <strong id="caja-turno">CUP 0</strong></p>
 
-            <!-- Stock crítico -->
-            <div id="sec-alertas" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-red-300 dark:border-red-900">
-                <h2 class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">🚨 Alertas de Stock Bajo (&lt; 5 unidades)</h2>
+                <div class="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-sm font-bold">📦 Mercancía del turno</h3>
+                        <button type="button" data-action="tab-dueno" data-tab="caja" class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">Ver detalle →</button>
+                    </div>
+                    <div id="merc-resumen" class="grid grid-cols-3 gap-2 text-center"></div>
+                </div>
+
+                <!-- Stock crítico -->
+            <div id="sec-alertas" class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-3 sm:p-5 border-2 border-red-300 dark:border-red-900">
+                <h2 class="text-base font-bold text-red-600 dark:text-red-400 mb-2">🚨 Alertas de Stock Bajo (&lt; 5 unidades)</h2>
                 <div id="contenedor-stock-critico" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
             </div>
 
-            <!-- Inventario -->
-            <div id="sec-inventario" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <div class="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-3">
+                    <h3 class="text-sm font-bold mb-3">👤 Ventas por cajero</h3>
+                    <div id="desglose-cajeros" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+            </div>
+
+            <!-- ============ 2. PRODUCTOS ============ -->
+            <div data-pestana="productos" class="space-y-4 hidden">
+                <!-- Inventario -->
+            <div id="sec-inventario" class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-3 sm:p-5 border dark:border-slate-700">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📦 Inventario y Stock (Inicial vs. Actual)</h2>
+                    <h2 class="text-base font-bold text-amber-700 dark:text-amber-400">📦 Inventario y Stock (Inicial vs. Actual)</h2>
                     <div class="flex gap-2">
                         <button type="button" data-action="abrir-tasa" class="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-2.5 rounded-lg font-medium">⚙️ Tasas y ajustes</button>
                         <button type="button" data-action="nuevo-producto" class="bg-emerald-600 text-white text-sm px-3 py-2.5 rounded-lg hover:bg-emerald-700 font-medium">+ Producto</button>
@@ -227,7 +258,7 @@
                     <button type="button" data-action="limpiar-filtro-inventario" class="text-xs bg-slate-200 dark:bg-slate-700 px-3 rounded-lg font-semibold">🧹 Limpiar</button>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
+                    <table class="tabla-movil w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-b dark:border-slate-700">
                             <tr>
                                 <th class="p-3">Producto</th>
@@ -241,10 +272,11 @@
                     </table>
                 </div>
             </div>
-
-            <!-- Categorías y subcategorías -->
-            <div id="sec-categorias" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
-                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-1">📁 Categorías y Subcategorías</h2>
+                <details id="sec-categorias" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 group" >
+                <summary class="cursor-pointer select-none list-none flex justify-between items-center p-3.5 font-bold text-sm">📁 Categorías y subcategorías<span class="text-slate-400 text-xs group-open:rotate-180 transition">▼</span></summary>
+                <div class="px-3 pb-3 space-y-3">
+            <div class="space-y-3">
+                
                 <p class="text-xs text-slate-500 mb-3">Ejemplo: categoría <strong>Bebidas</strong> → subcategoría <strong>Refresco</strong> → productos "Cola", "Naranja"… (usa el campo "Sabor / tipo").</p>
                 <div class="flex flex-wrap gap-2 items-center mb-3">
                     <input type="text" id="input-nueva-categoria" placeholder="Nombre de nueva categoría..." class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm flex-1 min-w-[200px]">
@@ -257,18 +289,44 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" id="contenedor-chips-categorias"></div>
             </div>
+            </div>
+            </details>
 
-            <!-- Personal -->
-            <div id="sec-personal" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+                <details id="sec-mermas" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 group" >
+                <summary class="cursor-pointer select-none list-none flex justify-between items-center p-3.5 font-bold text-sm">📉 Control de mermas<span class="text-slate-400 text-xs group-open:rotate-180 transition">▼</span></summary>
+                <div class="px-3 pb-3 space-y-3">
+            <div class="space-y-3">
+                <div class="flex justify-between items-center mb-4 gap-2">
+                    
+                    <button type="button" data-action="abrir-merma" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold">+ Registrar Merma</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="tabla-movil w-full text-left text-sm">
+                        <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
+                            <tr><th class="p-3">Hora</th><th class="p-3">Producto</th><th class="p-3">Cantidad</th><th class="p-3">Motivo</th><th class="p-3">Pérdida</th></tr>
+                        </thead>
+                        <tbody id="tabla-mermas" class="divide-y dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+            </div>
+            </details>
+
+            </div>
+
+            <!-- ============ 3. PERSONAL ============ -->
+            <div data-pestana="personal" class="space-y-4 hidden">
+                <!-- Personal -->
+            <div id="sec-personal" class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-3 sm:p-5 border dark:border-slate-700">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <div>
-                        <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">👥 Control de Asistencia y Turnos</h2>
+                        <h2 class="text-base font-bold text-amber-700 dark:text-amber-400">👥 Control de Asistencia y Turnos</h2>
                         <p class="text-xs text-slate-500">Cada cajero crea su propia cuenta desde la pantalla de inicio y elige su PIN personal (tú no lo ves). Aquí aprobas sus solicitudes y controlas su turno.</p>
                     </div>
                 </div>
                 <div id="solicitudes-empleados" class="hidden mb-4"></div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
+                    <table class="tabla-movil w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
                             <tr>
                                 <th class="p-3">Estado</th>
@@ -281,27 +339,58 @@
                     </table>
                 </div>
             </div>
-
-            <!-- Mermas -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
-                <div class="flex justify-between items-center mb-4 gap-2">
-                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📉 Control de Mermas</h2>
-                    <button type="button" data-action="abrir-merma" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold">+ Registrar Merma</button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
-                            <tr><th class="p-3">Hora</th><th class="p-3">Producto</th><th class="p-3">Cantidad</th><th class="p-3">Motivo</th><th class="p-3">Pérdida</th></tr>
-                        </thead>
-                        <tbody id="tabla-mermas" class="divide-y dark:divide-slate-700"></tbody>
-                    </table>
-                </div>
             </div>
 
-            <!-- Historial -->
-            <div id="sec-historial" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
+            <!-- ============ 4. CAJA ============ -->
+            <div data-pestana="caja" class="space-y-4 hidden">
+                <div id="sec-mercancia" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 p-3 sm:p-5 space-y-3">
+                    <div>
+                        <h2 class="text-base font-bold">📦 Mercancía: entregada vs. lo que queda</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Entregado = lo que había al abrir el turno (más lo que se reabasteció). Al cerrar el turno, lo que queda pasa a ser lo entregado del siguiente.</p>
+                    </div>
+                    <div id="merc-resumen-detalle" class="grid grid-cols-3 gap-2 text-center"></div>
+                    <div class="overflow-x-auto">
+                        <table class="tabla-movil w-full text-left text-sm">
+                            <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
+                                <tr><th class="p-3">Producto</th><th class="p-3">Entregado</th><th class="p-3">Vendido</th><th class="p-3">Merma</th><th class="p-3">Queda</th><th class="p-3">Sin explicar</th></tr>
+                            </thead>
+                            <tbody id="tabla-mercancia" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" data-action="copiar-mercancia" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2.5 rounded-lg font-bold">📋 Copiar el cuadre</button>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 p-3 sm:p-5 space-y-4">
+                    <div>
+                        <h2 class="text-base font-bold">💵 Cuadre de caja y cierre</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Turno actual. Al cerrar el turno todo vuelve a 0 y el resumen queda en "Turnos cerrados".</p>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold mb-2">📂 Ingresos por categoría (CUP / USD)</h3>
+                        <div id="desglose-categorias-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold mb-2">💵 Arqueos cerrados en este turno</h3>
+                        <div class="overflow-x-auto">
+                            <table class="tabla-movil w-full text-left text-sm">
+                                <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
+                                    <tr><th class="p-3">Hora</th><th class="p-3">Cajero</th><th class="p-3">Ventas</th><th class="p-3">Esperado</th><th class="p-3">Contado</th><th class="p-3">Resultado</th></tr>
+                                </thead>
+                                <tbody id="tabla-cortes" class="divide-y dark:divide-slate-700"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <button type="button" data-action="abrir-reporte-z" class="w-full bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white px-4 py-3.5 rounded-xl font-bold text-sm shadow">📊 Generar reporte Z / Cerrar turno</button>
+                </div>
+
+                <details id="sec-historial" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 group" >
+                <summary class="cursor-pointer select-none list-none flex justify-between items-center p-3.5 font-bold text-sm">📋 Historial de tickets (turno actual)<span class="text-slate-400 text-xs group-open:rotate-180 transition">▼</span></summary>
+                <div class="px-3 pb-3 space-y-3">
+            <div class="space-y-3">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                    <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📋 Historial de Tickets (turno actual)</h2>
+                    
                     <div class="flex items-center gap-2">
                         <select id="filtro-historial-cajero" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-2 text-xs">
                             <option value="TODOS">Todos los cajeros</option>
@@ -311,7 +400,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto max-h-72 overflow-y-auto">
-                    <table class="w-full text-left text-sm">
+                    <table class="tabla-movil w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700 sticky top-0">
                             <tr><th class="p-3">Hora</th><th class="p-3">Cajero</th><th class="p-3">Detalle</th><th class="p-3">Cobrado</th><th class="p-3">Total</th><th class="p-3 text-right">Recibo</th></tr>
                         </thead>
@@ -319,61 +408,14 @@
                     </table>
                 </div>
             </div>
-
-            <!-- Panel financiero -->
-            <div id="sec-financiero" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900 space-y-5">
-                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">📊 Panel Financiero y Cuadre de Cierre</h2>
-                <p class="text-xs text-slate-500">Turno actual. Cuando se cierra el turno, todo vuelve a 0 y el resumen queda guardado en "Turnos cerrados".</p>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-indigo-50 dark:bg-indigo-950/40 p-4 rounded-xl border dark:border-slate-700">
-                        <p class="text-xs text-indigo-600 font-medium">Ventas Totales</p>
-                        <p class="text-2xl font-extrabold mt-1" id="ventas-dia">$0.00 USD</p>
-                        <p class="text-sm font-bold text-indigo-700 dark:text-indigo-300" id="ventas-dia-cup">0 CUP</p>
-                    </div>
-                    <div class="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl border dark:border-slate-700">
-                        <p class="text-xs text-amber-600 font-medium">Gastos / Mermas</p>
-                        <p class="text-2xl font-extrabold mt-1" id="gastos-dia">$0.00 USD</p>
-                        <p class="text-sm font-bold text-amber-700 dark:text-amber-300" id="gastos-dia-cup">0 CUP</p>
-                    </div>
-                    <div class="bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-xl border dark:border-slate-700">
-                        <p class="text-xs text-emerald-600 font-medium">Ganancia Neta</p>
-                        <p class="text-2xl font-extrabold mt-1" id="ganancia-neta-dia">$0.00 USD</p>
-                        <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300" id="ganancia-neta-dia-cup">0 CUP</p>
-                    </div>
-                </div>
-                <p class="text-xs bg-slate-50 dark:bg-slate-900/60 border dark:border-slate-700 rounded-lg p-3">💵 Efectivo que debe haber en caja (todos los cajeros): <strong id="caja-turno">CUP 0</strong></p>
-
-                <div class="border-t dark:border-slate-700 pt-4">
-                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">📂 Ingresos por Categoría (CUP / USD)</h3>
-                    <div id="desglose-categorias-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-                </div>
-
-                <div class="border-t dark:border-slate-700 pt-4">
-                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">👤 Ventas por Cajero</h3>
-                    <div id="desglose-cajeros" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-                </div>
-
-                <div class="border-t dark:border-slate-700 pt-4">
-                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">💵 Arqueos cerrados en este turno</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
-                                <tr><th class="p-3">Hora</th><th class="p-3">Cajero</th><th class="p-3">Ventas</th><th class="p-3">Esperado</th><th class="p-3">Contado</th><th class="p-3">Resultado</th></tr>
-                            </thead>
-                            <tbody id="tabla-cortes" class="divide-y dark:divide-slate-700"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="flex justify-end pt-2">
-                    <button type="button" data-action="abrir-reporte-z" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-lg font-bold text-xs shadow">📊 Generar Reporte Z / Cerrar Turno</button>
-                </div>
             </div>
+            </details>
 
-            <!-- Reporte de ventas -->
-            <div id="sec-semana" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
-                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-3">📅 Reporte de Ventas de la Semana</h2>
+                <details id="sec-semana" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 group" >
+                <summary class="cursor-pointer select-none list-none flex justify-between items-center p-3.5 font-bold text-sm">📅 Reporte de ventas de la semana<span class="text-slate-400 text-xs group-open:rotate-180 transition">▼</span></summary>
+                <div class="px-3 pb-3 space-y-3">
+            <div class="space-y-3">
+                
                 <div class="flex flex-wrap gap-2 items-center mb-4">
                     <select id="semana-rango" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm">
                         <option value="ultimos7">Últimos 7 días</option>
@@ -392,12 +434,16 @@
                     <p class="text-sm text-slate-400 italic">Elige el periodo y toca "Generar reporte".</p>
                 </div>
             </div>
+            </div>
+            </details>
 
-            <!-- Cierres anteriores -->
-            <div id="sec-cierres" class="scroll-mt-14 bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 sm:p-6 border-2 border-amber-200 dark:border-amber-900">
-                <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400 mb-4">🗂️ Turnos Cerrados (últimos 30 días)</h2>
+                <details id="sec-cierres" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 group" >
+                <summary class="cursor-pointer select-none list-none flex justify-between items-center p-3.5 font-bold text-sm">🗂️ Turnos cerrados (últimos 30 días)<span class="text-slate-400 text-xs group-open:rotate-180 transition">▼</span></summary>
+                <div class="px-3 pb-3 space-y-3">
+            <div class="space-y-3">
+                
                 <div class="overflow-x-auto max-h-72 overflow-y-auto">
-                    <table class="w-full text-left text-sm">
+                    <table class="tabla-movil w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700 sticky top-0">
                             <tr><th class="p-3">Cierre</th><th class="p-3">Tickets</th><th class="p-3">Ventas</th><th class="p-3">Neto</th><th class="p-3">Cerrado por</th><th class="p-3"></th></tr>
                         </thead>
@@ -405,8 +451,42 @@
                     </table>
                 </div>
             </div>
+            </div>
+            </details>
+
+            </div>
+
+            <!-- ============ 5. AJUSTES ============ -->
+            <div data-pestana="ajustes" class="space-y-3 hidden">
+                <div class="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-3 space-y-2">
+                    <h3 class="text-sm font-bold">💱 Negocio</h3>
+                    <button type="button" data-action="abrir-tasa" class="menu-item">⚙️ Tasas del día y ajustes</button>
+                    <button type="button" data-action="abrir-cuenta" class="menu-item">👤 Mi cuenta y contraseña</button>
+                    <button type="button" data-action="modo-oscuro" class="menu-item">🌓 Tema</button>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-3 space-y-2">
+                    <h3 class="text-sm font-bold">💾 Respaldos</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Los datos se sincronizan con la nube cuando hay internet. Guarda un respaldo de vez en cuando.</p>
+                    <button type="button" data-action="exportar-respaldo" class="menu-item">💾 Exportar respaldo</button>
+                    <label class="menu-item cursor-pointer block">📂 Restaurar datos
+                        <input type="file" id="input-importar" accept=".json,application/json" class="hidden">
+                    </label>
+                    <button type="button" data-action="importar-antiguo" class="menu-item">⬆️ Importar datos de la versión anterior</button>
+                </div>
+                <button type="button" data-action="cerrar-modo-dueno" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl text-sm">🔓 Salir del panel del dueño</button>
+            </div>
         </div>
     </main>
+
+    <!-- Pestañas del panel del dueño -->
+    <nav id="nav-dueno" class="hidden fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-slate-900 border-t dark:border-slate-700 grid grid-cols-5 no-print" style="padding-bottom: env(safe-area-inset-bottom);" aria-label="Secciones del panel">
+        <button type="button" data-action="tab-dueno" data-tab="resumen" class="pestana"><span class="text-lg">📊</span><span>Resumen</span></button>
+        <button type="button" data-action="tab-dueno" data-tab="productos" class="pestana"><span class="text-lg">📦</span><span>Productos</span></button>
+        <button type="button" data-action="tab-dueno" data-tab="personal" class="pestana relative"><span class="text-lg">👥</span><span>Personal</span>
+            <span id="badge-tab-personal" class="hidden absolute top-1 right-[18%] bg-red-500 text-white text-[10px] rounded-full min-w-[16px] h-4 leading-4 px-1 font-bold"></span></button>
+        <button type="button" data-action="tab-dueno" data-tab="caja" class="pestana"><span class="text-lg">💰</span><span>Caja</span></button>
+        <button type="button" data-action="tab-dueno" data-tab="ajustes" class="pestana"><span class="text-lg">⚙️</span><span>Ajustes</span></button>
+    </nav>
 
     <!-- Barra del carrito (solo teléfono): total siempre a la vista -->
     <div id="barra-carrito-movil" class="hidden fixed bottom-0 inset-x-0 z-40 lg:hidden bg-indigo-700 text-white px-4 py-3 flex justify-between items-center shadow-2xl no-print" style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));">

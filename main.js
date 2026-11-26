@@ -81,8 +81,16 @@ export function programarRender() {
 
 function renderCabecera() {
   $('badge-usuario').textContent = estado.user ? `${estado.user.email}${estado.esDueno ? ' 👑' : ''}` : 'Sin sesión';
-  $('btn-cambiar-modo').textContent = estado.modoDueno ? '🔓 Salir del panel' : '🔒 Dueño';
-  $('btn-dark-mode').textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+  $('txt-modo-dueno').textContent = estado.modoDueno ? '🔓 Salir del panel del dueño' : '🔒 Panel del dueño';
+  $('btn-cambiar-modo').classList.toggle('hidden', !!estado.user && !estado.esDueno);
+  $('menu-usuario').textContent = estado.user ? estado.user.email : '';
+  const textoTema = `🌓 Tema: ${NOMBRE_TEMA[temaGuardado()]} (toca para cambiar)`;
+  document.querySelectorAll('[data-action="modo-oscuro"]').forEach((b) => (b.textContent = textoTema));
+  const solicitudes = estado.esDueno ? estado.empleados.filter((e) => e.pendiente).length : 0;
+  for (const [id, texto] of [['punto-menu', solicitudes], ['badge-solicitudes', `${solicitudes} nueva(s)`], ['badge-tab-personal', solicitudes]]) {
+    $(id).textContent = texto;
+    $(id).classList.toggle('hidden', !solicitudes);
+  }
   $('badge-conexion').textContent = navigator.onLine ? '🟢 En línea' : '🔴 Sin conexión (se guarda en el teléfono)';
   const p = estado.pendientes;
   $('badge-pendientes').textContent = p > 0 ? `⏳ ${p} venta(s) por sincronizar` : '';
@@ -92,6 +100,34 @@ function renderCabecera() {
 function actualizarVisibilidad() {
   $('vista-pos').classList.toggle('hidden', estado.modoDueno);
   $('panel-gestion-dueno').classList.toggle('hidden', !estado.modoDueno);
+  $('nav-dueno').classList.toggle('hidden', !estado.modoDueno);
+  const tabs = ['resumen', 'productos', 'personal', 'caja', 'ajustes'];
+  if (!tabs.includes(estado.tabDueno)) estado.tabDueno = 'resumen';
+  document.querySelectorAll('[data-pestana]').forEach((el) => el.classList.toggle('hidden', el.dataset.pestana !== estado.tabDueno));
+  document.querySelectorAll('#nav-dueno .pestana').forEach((b) => b.classList.toggle('activa', b.dataset.tab === estado.tabDueno));
+  $('titulo-pestana-dueno').textContent = TITULO_PESTANA[estado.tabDueno];
+}
+
+const TITULO_PESTANA = {
+  resumen: '📊 Resumen',
+  productos: '📦 Productos',
+  personal: '👥 Personal',
+  caja: '💰 Caja y cierre',
+  ajustes: '⚙️ Ajustes',
+};
+
+function abrirMenu() {
+  renderCabecera();
+  $('menu-principal').classList.remove('hidden');
+}
+function cerrarMenu() {
+  $('menu-principal').classList.add('hidden');
+}
+
+function irPestana(tab) {
+  estado.tabDueno = tab;
+  actualizarVisibilidad();
+  window.scrollTo({ top: 0 });
 }
 
 function renderTodo() {
@@ -142,21 +178,38 @@ function renderTodo() {
   if (estado.modoDueno) renderAdmin();
 }
 
-// ------------------------------------------------------------- modo oscuro
+// ------------------------------------------------------------- tema (automático / claro / oscuro)
 
-function aplicarModoOscuro(activo) {
-  document.documentElement.classList.toggle('dark', activo);
+const NOMBRE_TEMA = { auto: 'Automático', claro: 'Claro', oscuro: 'Oscuro' };
+
+function temaGuardado() {
+  try {
+    const t = localStorage.getItem('tema');
+    if (t === 'auto' || t === 'claro' || t === 'oscuro') return t;
+    const viejo = localStorage.getItem('modoOscuro');
+    return viejo === '1' ? 'oscuro' : viejo === '0' ? 'claro' : 'auto';
+  } catch (e) {
+    return 'auto';
+  }
+}
+
+function aplicarTema() {
+  const t = temaGuardado();
+  const oscuro = t === 'oscuro' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', oscuro);
   renderCabecera();
 }
 
 function alternarModoOscuro() {
-  const activo = !document.documentElement.classList.contains('dark');
+  const orden = ['auto', 'claro', 'oscuro'];
+  const siguiente = orden[(orden.indexOf(temaGuardado()) + 1) % orden.length];
   try {
-    localStorage.setItem('modoOscuro', activo ? '1' : '0');
+    localStorage.setItem('tema', siguiente);
   } catch (e) {
     /* modo privado: no se recuerda la preferencia */
   }
-  aplicarModoOscuro(activo);
+  aplicarTema();
+  toast(`Tema: ${NOMBRE_TEMA[siguiente]}`, 'info');
 }
 
 // ------------------------------------------------------------- sesión y modo dueño
@@ -295,6 +348,10 @@ function perfilCambio(perfil) {
       fn: enviarSolicitud,
     });
   }
+  if (!perfil.aprobado && perfil.enviando) {
+    pararDatos();
+    return setCarga('📤 Enviando tu solicitud al dueño… Necesita internet. No cierres la app hasta que cambie este mensaje.', true);
+  }
   if (!perfil.aprobado) {
     pararDatos();
     return setCarga(
@@ -421,6 +478,9 @@ const acciones = {
   'carga-accion': () => accionCarga && accionCarga(),
   imprimir: () => window.print(),
   'modo-oscuro': alternarModoOscuro,
+  'abrir-menu': abrirMenu,
+  'cerrar-menu': cerrarMenu,
+  'tab-dueno': (d) => irPestana(d.tab),
   'cerrar-sesion': salir,
   'acceso-dueno': accesoDueno,
   'cerrar-modo-dueno': salirModoDueno,
@@ -431,6 +491,7 @@ const acciones = {
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (el) {
+    if (el.closest('#menu-principal') && el.dataset.action !== 'modo-oscuro') cerrarMenu();
     const fn = acciones[el.dataset.action];
     if (fn) fn(el.dataset, el, e);
   }
@@ -487,11 +548,11 @@ datos.alEvento(manejarEvento);
 
 // ------------------------------------------------------------- arranque
 
+aplicarTema();
 try {
-  const guardado = localStorage.getItem('modoOscuro');
-  aplicarModoOscuro(guardado === null ? window.matchMedia('(prefers-color-scheme: dark)').matches : guardado === '1');
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => temaGuardado() === 'auto' && aplicarTema());
 } catch (e) {
-  aplicarModoOscuro(false);
+  /* navegador sin este aviso: el tema automático se aplica al abrir la app */
 }
 
 if ('serviceWorker' in navigator) {

@@ -7,6 +7,7 @@ export const estado = {
   user: null,
   esDueno: false, // la cuenta figura en /duenos/{uid}
   modoDueno: false, // el panel de administración está abierto
+  tabDueno: 'resumen', // pestaña abierta del panel (resumen, productos, personal, caja, ajustes)
 
   // configuración (documento config/general)
   configExiste: false,
