@@ -114,6 +114,12 @@ export function manejarEvento(ev) {
     return;
   }
 
+  if (ev.tipo === 'solicitud') {
+    const e = ev.empleado;
+    avisar('🆕 Solicitud de cajero', `${e.nombre} (${e.email}) pide entrar. Apruébalo en Personal.`, `solicitud-${e.id}`, 'info');
+    return;
+  }
+
   if (ev.tipo === 'producto-nuevo') {
     const p = ev.producto;
     avisar('🆕 Producto nuevo', `${p.nombre}${p.variante ? ' · ' + p.variante : ''} (${p.stock} un.)`, `nuevo-${p.id}`, 'info');

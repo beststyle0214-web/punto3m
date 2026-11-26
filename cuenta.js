@@ -73,7 +73,7 @@ const TEXTO_AVISOS = {
 export function renderCuenta() {
   if (!estado.user) return;
   $('cuenta-correo').textContent = estado.user.email;
-  $('cuenta-rol').textContent = estado.esDueno ? '👑 Dueño' : 'Cuenta de cajas';
+  $('cuenta-rol').textContent = estado.esDueno ? '👑 Dueño' : '🧾 Cajero';
   $('btn-avisos').textContent = TEXTO_AVISOS[estadoAvisos()];
   $('btn-avisos').classList.toggle('hidden', !estado.esDueno && estadoAvisos() !== 'activo');
   $('cuenta-instalar').classList.toggle('hidden', !promptInstalacion);

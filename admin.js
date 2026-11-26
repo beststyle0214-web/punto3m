@@ -10,7 +10,6 @@ import { aMinor, fmtMinor, fmtUSD, precioPrincipal, costoPrincipal } from './mon
 import {
   resumenTurno, cuadreInventario, rangoReporte, reportePeriodo, enlaceSMS,
 } from './calculos.js';
-import { hashPin, nuevaSal, pinValido } from './seguridad.js';
 import { planDesdeAntiguo, planDesdeRespaldo } from './migracion.js';
 import { LADO_FOTO } from './config.js';
 import {
@@ -83,22 +82,48 @@ export function renderChipsCategorias() {
 }
 
 export function renderEmpleados() {
-  $('tabla-empleados-admin').innerHTML = estado.empleados.length
-    ? estado.empleados
-        .map(
-          (e) => `<tr>
+  // Solicitudes de cajeros nuevos que esperan la aprobación del dueño
+  const pendientes = estado.empleados.filter((e) => e.pendiente);
+  const caja = $('solicitudes-empleados');
+  caja.classList.toggle('hidden', !pendientes.length);
+  caja.innerHTML = pendientes.length
+    ? `<div class="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-800 rounded-xl p-3 space-y-2">
+        <p class="text-sm font-bold text-amber-800 dark:text-amber-300">🆕 ${pendientes.length === 1 ? 'Solicitud de cajero' : `${pendientes.length} solicitudes de cajeros`}</p>
+        ${pendientes
+          .map(
+            (e) => `<div class="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-slate-800 rounded-lg p-2.5">
+              <div class="min-w-0"><div class="font-bold text-sm">${esc(e.nombre)}</div><div class="text-[11px] text-slate-500 break-all">${esc(e.email)}</div></div>
+              <div class="flex gap-1">
+                <button type="button" data-action="aprobar-empleado" data-id="${esc(e.id)}" class="text-xs bg-emerald-600 text-white px-3 py-2 rounded-lg font-bold">✅ Aprobar</button>
+                <button type="button" data-action="eliminar-empleado" data-id="${esc(e.id)}" class="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg font-bold">Rechazar</button>
+              </div></div>`,
+          )
+          .join('')}
+      </div>`
+    : '';
+
+  const lista = estado.empleados.filter((e) => !e.pendiente);
+  $('tabla-empleados-admin').innerHTML = lista.length
+    ? lista
+        .map((e) => {
+          const etiqueta = e.legacy
+            ? '<span class="block text-[10px] text-amber-600 font-semibold">⚠️ Sin cuenta (versión anterior): no puede entrar. Que se registre con su correo y elimina esta fila.</span>'
+            : e.esDueno
+              ? '<span class="block text-[10px] text-indigo-600 font-semibold">👑 Tu perfil de venta</span>'
+              : `<span class="block text-[10px] text-slate-500 break-all">${esc(e.email)}</span>`;
+          const acciones = e.legacy
+            ? `<button type="button" data-action="eliminar-empleado" data-id="${esc(e.id)}" class="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg font-bold" title="Eliminar" aria-label="Eliminar">🗑️</button>`
+            : `<button type="button" data-action="turno-empleado" data-id="${esc(e.id)}" class="text-xs px-3 py-2 rounded-lg font-bold text-white ${e.activo ? 'bg-red-600' : 'bg-emerald-600'}">${e.activo ? 'Finalizar turno' : 'Iniciar turno'}</button>
+               ${e.esDueno ? '' : `<button type="button" data-action="pin-empleado" data-id="${esc(e.id)}" class="text-xs bg-slate-100 dark:bg-slate-700 px-3 py-2 rounded-lg font-bold" title="Reiniciar PIN" aria-label="Reiniciar PIN">🔄 PIN</button>
+               <button type="button" data-action="eliminar-empleado" data-id="${esc(e.id)}" class="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg font-bold" title="Quitar acceso" aria-label="Quitar acceso">🗑️</button>`}`;
+          return `<tr>
             <td class="p-3"><span class="px-2 py-0.5 text-xs rounded-full font-bold ${e.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">${e.activo ? 'En turno' : 'Inactivo'}</span></td>
-            <td class="p-3 font-bold">${esc(e.nombre)}
-              ${e.pinHash ? '' : '<span class="block text-[10px] text-amber-600 font-semibold">⚠️ Sin PIN</span>'}</td>
+            <td class="p-3 font-bold">${esc(e.nombre)}${etiqueta}</td>
             <td class="p-3 font-mono text-indigo-600 dark:text-indigo-400 font-bold" id="crono-emp-${esc(e.id)}">${e.activo && e.inicioTurno ? duracion(e.inicioTurno) : '00:00:00'}</td>
-            <td class="p-3 text-right space-x-1 whitespace-nowrap">
-              <button type="button" data-action="turno-empleado" data-id="${esc(e.id)}" class="text-xs px-3 py-2 rounded-lg font-bold text-white ${e.activo ? 'bg-red-600' : 'bg-emerald-600'}">${e.activo ? 'Finalizar turno' : 'Iniciar turno'}</button>
-              <button type="button" data-action="pin-empleado" data-id="${esc(e.id)}" class="text-xs bg-slate-100 dark:bg-slate-700 px-3 py-2 rounded-lg font-bold" title="Cambiar PIN" aria-label="Cambiar PIN">🔑</button>
-              <button type="button" data-action="eliminar-empleado" data-id="${esc(e.id)}" class="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg font-bold" title="Eliminar" aria-label="Eliminar">🗑️</button>
-            </td></tr>`,
-        )
+            <td class="p-3 text-right space-x-1 whitespace-nowrap">${acciones}</td></tr>`;
+        })
         .join('')
-    : '<tr><td colspan="4" class="p-4 text-center text-slate-400 italic">Aún no hay trabajadores. Añade el primero.</td></tr>';
+    : '<tr><td colspan="4" class="p-4 text-center text-slate-400 italic">Aún no hay cajeros. Dile a cada uno que cree su cuenta desde la pantalla de inicio ("Crear mi cuenta de cajero") y aparecerá aquí para que la apruebes.</td></tr>';
 }
 
 export function actualizarCronometros() {
@@ -513,37 +538,25 @@ function guardarTasa() {
 
 // ------------------------------------------------------------- personal
 
-function abrirModalEmpleado(id) {
+function aprobarEmpleado(id) {
   if (!exigirDueno()) return;
-  const e = id ? estado.empleados.find((x) => x.id === id) : null;
-  $('empleado-modal-titulo').textContent = e ? `🔑 Cambiar PIN de ${e.nombre}` : '👤 Nuevo Trabajador';
-  $('empleado-id').value = e ? e.id : '';
-  $('empleado-nombre').value = e ? e.nombre : '';
-  $('empleado-nombre').disabled = !!e;
-  $('empleado-pin').value = '';
-  $('empleado-error').classList.add('hidden');
-  abrirModal('modal-empleado');
-  setTimeout(() => (e ? $('empleado-pin') : $('empleado-nombre')).focus(), 30);
+  const e = estado.empleados.find((x) => x.id === id);
+  if (!e) return;
+  enviar(datos.aprobarEmpleado(id), 'Aprobar cajero');
+  toast(`✅ ${e.nombre} ya puede entrar. Elegirá su propio PIN.`);
 }
 
-async function guardarEmpleado() {
+async function reiniciarPinEmpleado(id) {
   if (!exigirDueno()) return;
-  const id = $('empleado-id').value;
-  const nombre = $('empleado-nombre').value.trim();
-  const pin = $('empleado-pin').value.trim();
-  const error = (t) => {
-    $('empleado-error').textContent = t;
-    $('empleado-error').classList.remove('hidden');
-  };
-  if (!nombre) return error('Escribe el nombre.');
-  if (!pinValido(pin)) return error('El PIN debe tener de 4 a 8 dígitos.');
-
-  const sal = nuevaSal();
-  const pinHash = await hashPin(pin, sal);
-  if (id) enviar(datos.actualizarEmpleado(id, { sal, pinHash }), 'PIN');
-  else enviar(datos.crearEmpleado({ nombre, activo: false, inicioTurno: null, sal, pinHash }), 'Trabajador');
-  cerrarModal('modal-empleado');
-  toast(id ? 'PIN actualizado' : `${nombre} añadido`);
+  const e = estado.empleados.find((x) => x.id === id);
+  if (!e) return;
+  const ok = await confirmar(
+    `¿Reiniciar el PIN de ${e.nombre}? La próxima vez que abra su caja elegirá un PIN nuevo. Tú no verás su PIN.`,
+    { si: 'Reiniciar PIN' },
+  );
+  if (!ok) return;
+  enviar(datos.reiniciarPin(id), 'PIN');
+  toast('PIN reiniciado');
 }
 
 function alternarTurno(id) {
@@ -560,7 +573,10 @@ async function eliminarEmpleado(id) {
   if (!exigirDueno()) return;
   const e = estado.empleados.find((x) => x.id === id);
   if (!e) return;
-  if (!(await confirmar(`¿Eliminar a ${e.nombre}? Sus ventas anteriores se conservan.`, { peligro: true, si: 'Eliminar' }))) return;
+  const texto = e.pendiente
+    ? `¿Rechazar la solicitud de ${e.nombre}?`
+    : `¿Quitar el acceso de ${e.nombre}? Sus ventas anteriores se conservan, y su PIN se borra.`;
+  if (!(await confirmar(texto, { peligro: true, si: e.pendiente ? 'Rechazar' : 'Quitar acceso' }))) return;
   enviar(datos.eliminarEmpleado(id), 'Trabajador');
 }
 
@@ -866,7 +882,7 @@ async function importarDatosAntiguos() {
   enviar(r.promesa, 'Importación');
   toast(`Importando ${r.productos} producto(s) y ${r.empleados} trabajador(es)…`);
   if (r.empleados) {
-    avisar('Los trabajadores importados no tienen PIN. Asígnaselo con el botón 🔑 en "Control de Asistencia".', 'Falta asignar PIN');
+    avisar('Los trabajadores importados de la versión anterior no tienen cuenta. Cada uno debe crear la suya desde la pantalla de inicio; luego puedes eliminar estas filas.', 'Falta crear cuentas');
   }
 }
 
@@ -903,9 +919,8 @@ export const accionesAdmin = {
   'eliminar-producto': (d) => eliminarProducto(d.id),
   'abrir-tasa': abrirModalTasa,
   'guardar-tasa': guardarTasa,
-  'nuevo-empleado': () => abrirModalEmpleado(null),
-  'pin-empleado': (d) => abrirModalEmpleado(d.id),
-  'guardar-empleado': guardarEmpleado,
+  'aprobar-empleado': (d) => aprobarEmpleado(d.id),
+  'pin-empleado': (d) => reiniciarPinEmpleado(d.id),
   'turno-empleado': (d) => alternarTurno(d.id),
   'eliminar-empleado': (d) => eliminarEmpleado(d.id),
   'abrir-merma': abrirModalMerma,

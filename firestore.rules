@@ -1,0 +1,119 @@
+rules_version = '2';
+
+// Reglas de seguridad de Punto 3 M (versión con cuentas de cajeros).
+//
+//  - "Dueño" = la cuenta tiene un documento en /duenos/{su uid} (se crea a mano en la consola).
+//  - Cada cajero crea su propia cuenta (correo + contraseña) y queda "pendiente" en /empleados/{su uid}.
+//    El dueño lo aprueba (aprobado: true). Hasta entonces no puede leer ni escribir nada más.
+//  - El PIN de cada cajero vive en /pins/{su uid}: solo ese cajero lo lee y lo cambia.
+//    El dueño solo puede BORRARLO (reiniciar), nunca verlo.
+//  - Un cajero aprobado puede: leer productos/config/turno, ver SOLO sus ventas, registrar ventas
+//    propias, bajar stock al vender y cerrar su propio arqueo.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function esDueno() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/duenos/$(request.auth.uid));
+    }
+
+    function esEmpleado() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/empleados/$(request.auth.uid))
+        && get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.aprobado == true;
+    }
+
+    function puedeVender() {
+      return esDueno() || esEmpleado();
+    }
+
+    match /duenos/{uid} {
+      allow get: if autenticado() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    match /config/{doc} {
+      allow read: if puedeVender();
+      allow write: if esDueno();
+    }
+
+    match /turno/{doc} {
+      allow read: if puedeVender();
+      allow write: if esDueno();
+    }
+
+    match /productos/{id} {
+      allow read: if puedeVender();
+      allow create, delete: if esDueno();
+      allow update: if esDueno()
+        // un cajero solo puede BAJAR el stock (al vender), sin tocar nada más
+        || (esEmpleado()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
+            && request.resource.data.stock is number
+            && request.resource.data.stock <= resource.data.stock);
+    }
+
+    match /empleados/{id} {
+      // el dueño ve a todos; cada cajero solo ve su propio perfil
+      allow get: if esDueno() || (autenticado() && request.auth.uid == id);
+      allow list: if esDueno();
+      // el dueño crea su perfil de venta; un cajero crea el suyo SIEMPRE pendiente
+      allow create: if esDueno()
+        || (autenticado() && request.auth.uid == id
+            && request.resource.data.aprobado == false
+            && !('esDueno' in request.resource.data)
+            && request.resource.data.activo == false);
+      allow delete: if esDueno();
+      allow update: if esDueno()
+        // un cajero aprobado solo marca el corte de su propio arqueo
+        || (esEmpleado() && request.auth.uid == id
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['corteTs'])
+            && request.resource.data.corteTs is number);
+    }
+
+    // PIN personal: solo su dueño lo lee/escribe; el dueño de la tienda solo puede borrarlo.
+    match /pins/{uid} {
+      allow get: if autenticado() && request.auth.uid == uid;
+      allow create, update: if esEmpleado() && request.auth.uid == uid
+        && request.resource.data.sal is string
+        && request.resource.data.pinHash is string;
+      allow delete: if esDueno() || (autenticado() && request.auth.uid == uid);
+      allow list: if false;
+    }
+
+    // Las ventas no se editan ni se borran. Cada cajero solo ve las suyas.
+    match /ventas/{id} {
+      allow read: if esDueno() || (esEmpleado() && resource.data.cajeroId == request.auth.uid);
+      allow create: if puedeVender()
+        && request.resource.data.keys().hasAll(['turnoId', 'ts', 'items', 'moneda', 'cobrado', 'cajeroId'])
+        && request.resource.data.cajeroId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /mermas/{id} {
+      allow read, write: if esDueno();
+    }
+
+    // Arqueos cerrados: los lee el dueño; cada cajero crea el suyo.
+    match /cortes/{id} {
+      allow read: if esDueno();
+      allow create: if puedeVender()
+        && request.auth.uid == request.resource.data.cajeroId
+        && request.resource.data.keys().hasAll(['turnoId', 'cajeroId', 'hasta', 'esperado', 'contadoCUP']);
+      allow update, delete: if false;
+    }
+
+    match /cierres/{id} {
+      allow read, write: if esDueno();
+    }
+
+    match /negocio/{doc} {
+      allow read: if esDueno();
+      allow write: if false;
+    }
+  }
+}

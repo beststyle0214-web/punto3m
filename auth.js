@@ -3,6 +3,7 @@
 import { auth, db, EmailAuthProvider } from './firebase.js';
 import { hashPin, nuevaSal } from './seguridad.js';
 import { conTiempo } from './utils.js';
+import { crearPerfilCajero } from './data.js';
 
 export const observarSesion = (cb) => auth.onAuthStateChanged(cb);
 export const cerrarSesion = () => auth.signOut();
@@ -11,6 +12,24 @@ export async function iniciarSesion(email, password) {
   const cred = await auth.signInWithEmailAndPassword(email, password);
   await recordarClave(cred.user.uid, password);
   return cred;
+}
+
+// ---------------------------------------------------------------- cuenta de cajero
+// El cajero crea su propia cuenta (correo + contraseña) y queda como "pendiente" hasta que el dueño la
+// aprueba. Mientras se crea la cuenta y su perfil, el arranque de la sesión espera (esperarRegistro).
+
+let registroEnCurso = Promise.resolve();
+
+/** Resuelve cuando termina un registro en marcha (con un tope por si la conexión es muy lenta). */
+export const esperarRegistro = () =>
+  Promise.race([registroEnCurso, new Promise((r) => setTimeout(r, 12000))]);
+
+export function registrarCajero(nombre, email, password) {
+  const tarea = auth
+    .createUserWithEmailAndPassword(email, password)
+    .then((cred) => crearPerfilCajero(cred.user.uid, nombre, email).then(() => cred));
+  registroEnCurso = tarea.catch(() => {}); // se asigna al instante: el observador de sesión lo espera
+  return tarea;
 }
 
 /** Envía el correo para elegir una contraseña nueva (necesita internet). */
@@ -110,7 +129,11 @@ export function mensajeErrorAuth(e) {
     case 'auth/too-many-requests':
       return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
     case 'auth/network-request-failed':
-      return 'Sin conexión con Google. Revisa tu internet (si estás en Cuba, puede hacer falta VPN para entrar la primera vez).';
+      return 'No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo. (Si estás en Cuba, la app necesita el intermediario configurado para funcionar sin VPN.)';
+    case 'auth/email-already-in-use':
+      return 'Ese correo ya tiene una cuenta. Toca "Volver", entra con ella o usa "¿Olvidaste tu contraseña?".';
+    case 'auth/operation-not-allowed':
+      return 'El registro por correo no está activado en Firebase (Authentication → Método de acceso → Correo/contraseña).';
     case 'auth/weak-password':
       return 'La contraseña nueva es muy débil. Usa al menos 8 caracteres.';
     case 'auth/requires-recent-login':

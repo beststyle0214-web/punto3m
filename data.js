@@ -5,7 +5,9 @@
 //   turno/actual     { id, inicio }
 //   productos/{id}   { codigo, nombre, variante, categoria, subcategoria, foto, moneda, precio,
 //                      costo, costoMoneda, costoCents, stockInicial, stock }
-//   empleados/{id}   { nombre, activo, inicioTurno(ms), corteTs(ms), sal, pinHash }
+//   empleados/{uid}  perfil de cada cajero (el id es el uid de su cuenta de Firebase):
+//                    { nombre, email, aprobado, activo(en turno), inicioTurno(ms), corteTs(ms), creado }
+//   pins/{uid}       { sal, pinHash } PIN personal: solo lo puede leer su dueño (ni el dueño del negocio)
 //   ventas/{id}      ticket completo, con turnoId
 //   mermas/{id}      con turnoId
 //   cortes/{id}      arqueo cerrado por un cajero (turnoId, cajero, esperado, contado, diferencia)
@@ -24,6 +26,7 @@ const col = (nombre) => db.collection(nombre);
 
 let bajas = []; // funciones para dejar de escuchar
 let bajasTurno = [];
+let bajaPerfil = null;
 
 // ---------------------------------------------------------------- eventos (para los avisos)
 // Se avisa de: ventas nuevas, producto nuevo y cambios de stock, pero solo de lo que ocurre
@@ -89,11 +92,42 @@ function observadorDeNuevos(procesar) {
 
 // ---------------------------------------------------------------- escuchas
 
-export function detenerEscuchas() {
+/** Deja de escuchar los datos del negocio (se conserva la escucha del perfil del cajero). */
+export function detenerDatos() {
   bajas.forEach((f) => f());
   bajasTurno.forEach((f) => f());
   bajas = [];
   bajasTurno = [];
+}
+
+export function detenerEscuchas() {
+  detenerDatos();
+  if (bajaPerfil) bajaPerfil();
+  bajaPerfil = null;
+}
+
+/** Convierte un documento de /empleados en el objeto que usa la app. */
+function mapearEmpleado(id, x) {
+  return {
+    id,
+    nombre: x.nombre || 'Sin nombre',
+    email: x.email || '',
+    esDueno: !!x.esDueno,
+    aprobado: x.aprobado === true,
+    pendiente: x.aprobado === false && !!x.email, // pidió entrar y espera la aprobación
+    legacy: !x.email && !x.esDueno && x.aprobado !== true, // trabajador de la versión anterior (sin cuenta)
+    activo: !!x.activo,
+    inicioTurno: aMillis(x.inicioTurno),
+    corteTs: aMillis(x.corteTs),
+  };
+}
+
+/** Sigue en vivo el perfil del cajero que inició sesión (para saber si el dueño ya lo aprobó). */
+export function escucharPerfil(uid, cambio, error) {
+  if (bajaPerfil) bajaPerfil();
+  bajaPerfil = col('empleados')
+    .doc(uid)
+    .onSnapshot((s) => cambio(s.exists ? mapearEmpleado(s.id, s.data()) : null), error);
 }
 
 function escucharTurno(turnoId, cambio, error) {
@@ -106,25 +140,26 @@ function escucharTurno(turnoId, cambio, error) {
   if (!turnoId) return;
 
   const avisarVentas = observadorDeNuevos((ventas) => emitir({ tipo: 'ventas', ventas }));
+  let consultaVentas = col('ventas').where('turnoId', '==', turnoId);
+  // Un cajero solo lee SUS ventas (las reglas de Firestore también lo exigen).
+  if (!estado.esDueno) consultaVentas = consultaVentas.where('cajeroId', '==', estado.user.uid);
   bajasTurno.push(
-    col('ventas')
-      .where('turnoId', '==', turnoId)
-      .onSnapshot((s) => {
+    consultaVentas.onSnapshot((s) => {
         estado.ventas = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.ts - a.ts);
         estado.pendientes = s.docs.filter((d) => d.metadata.hasPendingWrites).length;
         cambio();
         avisarVentas(s);
       }, error),
   );
-  bajasTurno.push(
-    col('mermas')
-      .where('turnoId', '==', turnoId)
-      .onSnapshot((s) => {
-        estado.mermas = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.ts - a.ts);
-        cambio();
-      }, error),
-  );
   if (estado.esDueno) {
+    bajasTurno.push(
+      col('mermas')
+        .where('turnoId', '==', turnoId)
+        .onSnapshot((s) => {
+          estado.mermas = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.ts - a.ts);
+          cambio();
+        }, error),
+    );
     bajasTurno.push(
       col('cortes')
         .where('turnoId', '==', turnoId)
@@ -193,26 +228,39 @@ export function iniciarEscuchas(cambio, fallo) {
     }, error),
   );
 
-  bajas.push(
-    col('empleados').onSnapshot((s) => {
-      estado.empleados = s.docs
-        .map((d) => {
-          const x = d.data();
-          return {
-            id: d.id,
-            nombre: x.nombre || 'Sin nombre',
-            activo: !!x.activo,
-            inicioTurno: aMillis(x.inicioTurno),
-            corteTs: aMillis(x.corteTs),
-            sal: x.sal || null,
-            pinHash: x.pinHash || null,
-          };
-        })
-        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-      estado.cargado.empleados = true;
-      cambio();
-    }, error),
-  );
+  if (estado.esDueno) {
+    let baseEmpleados = false;
+    bajas.push(
+      col('empleados').onSnapshot((s) => {
+        estado.empleados = s.docs
+          .map((d) => mapearEmpleado(d.id, d.data()))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        estado.cargado.empleados = true;
+        cambio();
+
+        if (!baseEmpleados) {
+          if (!s.metadata.fromCache) baseEmpleados = true;
+          return;
+        }
+        s.docChanges().forEach((c) => {
+          if (c.type !== 'added' || c.doc.metadata.hasPendingWrites) return;
+          const e = mapearEmpleado(c.doc.id, c.doc.data());
+          if (e.pendiente) emitir({ tipo: 'solicitud', empleado: e });
+        });
+      }, error),
+    );
+  } else {
+    // El cajero solo lee su propio perfil.
+    bajas.push(
+      col('empleados')
+        .doc(estado.user.uid)
+        .onSnapshot((s) => {
+          estado.empleados = s.exists ? [mapearEmpleado(s.id, s.data())] : [];
+          estado.cargado.empleados = true;
+          cambio();
+        }, error),
+    );
+  }
 
   bajas.push(
     col('turno')
@@ -320,11 +368,44 @@ export const reabastecerProducto = (id, n) =>
     .update({ stock: FieldValue.increment(n), stockInicial: FieldValue.increment(n) });
 
 // empleados
-export const crearEmpleado = (datos) => col('empleados').add(datos);
 export const actualizarEmpleado = (id, datos) => col('empleados').doc(id).update(datos);
-export const eliminarEmpleado = (id) => col('empleados').doc(id).delete();
-/** Un cajero cambia su propio PIN (las reglas solo le dejan tocar estos dos campos). */
-export const cambiarPinEmpleado = (id, sal, pinHash) => col('empleados').doc(id).update({ sal, pinHash });
+export const aprobarEmpleado = (id) => col('empleados').doc(id).update({ aprobado: true });
+
+/** El cajero pide entrar: queda "pendiente" hasta que el dueño lo apruebe. */
+export const crearPerfilCajero = (uid, nombre, email) =>
+  col('empleados').doc(uid).set({ nombre, email, aprobado: false, activo: false, inicioTurno: null, creado: Date.now() });
+
+/** La cuenta del dueño también puede vender: se le crea su perfil (ya aprobado, sin PIN). */
+export const crearPerfilDueno = (uid, email) =>
+  col('empleados')
+    .doc(uid)
+    .set({ nombre: 'Dueño', email, esDueno: true, aprobado: true, activo: false, inicioTurno: null, creado: Date.now() });
+
+/** Quita al trabajador y su PIN (su cuenta de Google/Firebase queda, pero sin permisos). */
+export function eliminarEmpleado(id) {
+  const batch = db.batch();
+  batch.delete(col('empleados').doc(id));
+  batch.delete(col('pins').doc(id));
+  return batch.commit();
+}
+
+// ---- PIN personal (la huella del PIN vive aparte, donde solo la lee su propio cajero)
+
+/** Lee el PIN guardado de este cajero ({ sal, pinHash } o null). Sin internet usa la copia del aparato. */
+export async function leerPin(uid) {
+  const ref = col('pins').doc(uid);
+  let s;
+  try {
+    s = await conTiempo(ref.get(), 8000);
+  } catch (e) {
+    if (e && e.code === 'permission-denied') throw e;
+    s = await ref.get({ source: 'cache' });
+  }
+  return s.exists ? s.data() : null;
+}
+export const guardarPin = (uid, sal, pinHash) => col('pins').doc(uid).set({ sal, pinHash, ts: Date.now() });
+/** El dueño reinicia el PIN de un cajero: la próxima vez que entre, elige uno nuevo. */
+export const reiniciarPin = (uid) => col('pins').doc(uid).delete();
 
 /**
  * Registra la venta y descuenta el stock en una sola operación atómica.

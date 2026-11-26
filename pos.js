@@ -203,10 +203,6 @@ export function renderCajero() {
 }
 
 export function renderPOS() {
-  if (estado.cajeroId && !cajeroActual() && estado.cargado.empleados) {
-    estado.cajeroId = null; // el cajero fue eliminado
-    sessionStorage.removeItem('cajeroId');
-  }
   renderCategorias();
   renderGrid();
   renderCarrito();
@@ -286,50 +282,33 @@ const abrirEscanerVentas = () => abrirEscaner(agregarPorCodigo, { continuo: true
 // ------------------------------------------------------------- cajero y PIN
 
 export function abrirSeleccionCajero() {
-  const lista = $('lista-modal-cajeros');
-  lista.innerHTML = estado.empleados.length
-    ? estado.empleados
-        .map(
-          (e) => `<div class="flex gap-2">
-            <button type="button" data-action="elegir-cajero" data-id="${esc(e.id)}"
-              class="flex-1 text-left p-3 bg-slate-100 dark:bg-slate-700 rounded-lg font-bold flex justify-between items-center ${e.id === estado.cajeroId ? 'ring-2 ring-indigo-500' : ''}">
-              <span>${esc(e.nombre)}</span>
-              <span class="text-[10px] font-semibold">${e.pinHash ? '🔒 PIN' : ''} ${e.activo ? '🟢 En turno' : ''}</span></button>
-            ${e.pinHash ? `<button type="button" data-action="cambiar-pin" data-id="${esc(e.id)}" class="px-3 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm" title="Cambiar mi PIN" aria-label="Cambiar mi PIN">🔑</button>` : ''}
-          </div>`,
-        )
-        .join('')
-    : '<p class="text-xs text-slate-400 italic">No hay cajeros. El dueño debe añadirlos en el panel de administración.</p>';
-  $('btn-quitar-cajero').classList.toggle('hidden', !estado.cajeroId);
+  const c = cajeroActual();
+  $('lista-modal-cajeros').innerHTML = c
+    ? `<div class="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
+         <div class="font-bold">${esc(c.nombre)} ${c.activo ? '<span class="text-[10px] font-semibold">🟢 En turno</span>' : ''}</div>
+         <div class="text-[11px] text-slate-500 break-all">${esc(estado.user ? estado.user.email : '')}</div>
+       </div>
+       ${estado.esDueno ? '' : '<button type="button" data-action="cambiar-pin" class="w-full p-3 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm font-bold text-left">🔑 Cambiar mi PIN</button>'}`
+    : '<p class="text-xs text-slate-400 italic">Tu perfil todavía se está cargando.</p>';
+  $('btn-quitar-cajero').classList.toggle('hidden', estado.esDueno || !c);
   abrirModal('modal-seleccion-cajero');
 }
 
-async function elegirCajero(id) {
-  const e = estado.empleados.find((x) => x.id === id);
-  if (!e) return;
-  if (e.pinHash) {
-    const pin = await pedirTexto(`PIN de ${e.nombre}`, {
-      tipo: 'password', inputmode: 'numeric', placeholder: 'PIN',
-      texto: 'Si olvidaste tu PIN, pídele al dueño que te ponga uno nuevo (botón 🔑 en el panel).',
-    });
-    if (pin === null) return;
-    if (!(await verificarPin(pin, e.sal, e.pinHash))) return toast('PIN incorrecto', 'error');
-  }
-  estado.cajeroId = id;
-  sessionStorage.setItem('cajeroId', id);
-  cerrarModal('modal-seleccion-cajero');
-  renderCajero();
-  toast(`Cajero activo: ${e.nombre}`);
-}
-
 /** El cajero cambia su propio PIN (pide el actual y el nuevo dos veces). */
-async function cambiarPinPropio(id) {
-  const e = estado.empleados.find((x) => x.id === id);
-  if (!e) return;
+async function cambiarPinPropio() {
+  const uid = estado.user.uid;
+  let guardado;
+  try {
+    guardado = await datos.leerPin(uid);
+  } catch (e) {
+    return toast('No se pudo leer tu PIN. Revisa la conexión.', 'error');
+  }
   const opciones = { tipo: 'password', inputmode: 'numeric', placeholder: 'PIN' };
-  const actual = await pedirTexto(`PIN actual de ${e.nombre}`, opciones);
-  if (actual === null) return;
-  if (!(await verificarPin(actual, e.sal, e.pinHash))) return toast('El PIN actual no es correcto', 'error');
+  if (guardado) {
+    const actual = await pedirTexto('Tu PIN actual', opciones);
+    if (actual === null) return;
+    if (!(await verificarPin(actual, guardado.sal, guardado.pinHash))) return toast('El PIN actual no es correcto', 'error');
+  }
   const nuevo = await pedirTexto('PIN nuevo (4 a 8 números)', opciones);
   if (nuevo === null) return;
   if (!pinValido(nuevo)) return toast('El PIN debe tener de 4 a 8 dígitos', 'error');
@@ -337,10 +316,12 @@ async function cambiarPinPropio(id) {
   if (repetido === null) return;
   if (repetido !== nuevo) return toast('Los dos PIN no coinciden', 'error');
   const sal = nuevaSal();
-  datos.cambiarPinEmpleado(id, sal, await hashPin(nuevo, sal)).catch((err) => mostrarFallo(err, 'PIN'));
+  datos.guardarPin(uid, sal, await hashPin(nuevo, sal)).catch((err) => mostrarFallo(err, 'PIN'));
+  cerrarModal('modal-seleccion-cajero');
   toast('✅ PIN cambiado');
 }
 
+/** Bloquea la caja: se vuelve a pedir el PIN (para cambiar de turno o dejar el mostrador). */
 async function quitarCajero() {
   const c = cajeroActual();
   if (c) {
@@ -348,7 +329,7 @@ async function quitarCajero() {
     if (sinCuadrar > 0) {
       const hacer = await confirmar(
         `${c.nombre} tiene ${sinCuadrar} venta(s) sin cuadrar. Lo mejor es hacer el arqueo antes de salir, para que la caja del siguiente cajero empiece limpia.`,
-        { titulo: '¿Hacer el arqueo ahora?', si: 'Hacer arqueo', no: 'Salir sin arqueo' },
+        { titulo: '¿Hacer el arqueo ahora?', si: 'Hacer arqueo', no: 'Bloquear sin arqueo' },
       );
       if (hacer) {
         cerrarModal('modal-seleccion-cajero');
@@ -357,9 +338,14 @@ async function quitarCajero() {
     }
   }
   estado.cajeroId = null;
-  sessionStorage.removeItem('cajeroId');
+  try {
+    sessionStorage.removeItem('cajeroId');
+  } catch (e) {
+    /* sin almacenamiento de sesión */
+  }
   cerrarModal('modal-seleccion-cajero');
   renderCajero();
+  window.dispatchEvent(new Event('p3m:bloquear'));
 }
 
 // ------------------------------------------------------------- cobro
@@ -666,8 +652,7 @@ export const accionesPOS = {
   cobrar: (d) => iniciarCobro(d.moneda),
   'confirmar-venta': confirmarVenta,
   'abrir-cajeros': abrirSeleccionCajero,
-  'elegir-cajero': (d) => elegirCajero(d.id),
-  'cambiar-pin': (d) => cambiarPinPropio(d.id),
+  'cambiar-pin': cambiarPinPropio,
   'quitar-cajero': quitarCajero,
   'abrir-arqueo': abrirArqueo,
   'limpiar-arqueo': limpiarArqueo,

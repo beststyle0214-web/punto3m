@@ -40,6 +40,7 @@
     <div id="pantalla-carga" class="fixed inset-0 z-[60] bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center gap-3 p-6 text-center no-print">
         <div class="text-4xl">🚀</div>
         <p id="carga-texto" class="text-sm text-slate-500 dark:text-slate-400 max-w-sm">Cargando…</p>
+        <button type="button" id="carga-accion" data-action="carga-accion" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-6 py-3 rounded-xl font-bold"></button>
         <button type="button" id="carga-salir" data-action="cerrar-sesion" class="hidden bg-slate-700 text-white text-xs px-4 py-2 rounded-lg font-bold">Cerrar sesión</button>
     </div>
 
@@ -56,6 +57,27 @@
             <p id="login-info" class="hidden text-xs text-emerald-700 dark:text-emerald-400 font-semibold"></p>
             <button type="submit" id="btn-login" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm">Entrar</button>
             <button type="button" data-action="olvide-password" class="w-full text-xs text-indigo-600 dark:text-indigo-400 underline py-1">¿Olvidaste tu contraseña?</button>
+            <div class="border-t dark:border-slate-700 pt-3 space-y-2 text-center">
+                <p class="text-[11px] text-slate-500">¿Eres cajero y todavía no tienes tu cuenta?</p>
+                <button type="button" data-action="abrir-registro" class="w-full border-2 border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold py-2.5 rounded-xl text-sm">Crear mi cuenta de cajero</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Registro de cajero -->
+    <div id="pantalla-registro" class="fixed inset-0 z-[56] bg-slate-100 dark:bg-slate-900 hidden items-center justify-center p-4 no-print overflow-y-auto">
+        <form id="form-registro" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-3">
+            <div class="text-center">
+                <h1 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Cuenta de cajero 🧾</h1>
+                <p class="text-xs text-slate-500">Crea tu cuenta con tu correo. Después el dueño la aprueba y tú eliges tu PIN personal, que nadie más verá.</p>
+            </div>
+            <input type="text" id="registro-nombre" autocomplete="name" required maxlength="40" placeholder="Tu nombre" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-base">
+            <input type="email" id="registro-email" autocomplete="email" required placeholder="Tu correo (Gmail)" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-base">
+            <input type="password" id="registro-password" autocomplete="new-password" required minlength="8" placeholder="Contraseña (mínimo 8 caracteres)" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-base">
+            <input type="password" id="registro-repetir" autocomplete="new-password" required minlength="8" placeholder="Repite la contraseña" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-3 text-base">
+            <p id="registro-error" class="hidden text-xs text-red-600 font-semibold"></p>
+            <button type="submit" id="btn-registro" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm">Crear mi cuenta</button>
+            <button type="button" data-action="cerrar-registro" class="w-full text-xs text-slate-500 underline py-1">← Volver a iniciar sesión</button>
         </form>
     </div>
 
@@ -71,7 +93,7 @@
                 <span id="badge-rol" class="text-xs bg-indigo-500 dark:bg-indigo-700 px-3 py-1.5 rounded-full font-medium">Cajero: Ninguno</span>
                 <button type="button" id="btn-instalar" data-action="instalar-app" class="hidden bg-emerald-500 hover:bg-emerald-600 text-xs px-3 py-2 rounded-lg font-semibold">📲 Instalar</button>
                 <button type="button" id="btn-dark-mode" data-action="modo-oscuro" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold" aria-label="Cambiar modo oscuro">🌙</button>
-                <button type="button" data-action="abrir-cajeros" class="bg-blue-600 hover:bg-blue-700 text-xs px-3 py-2 rounded-lg font-semibold shadow">👥 Cajero</button>
+                <button type="button" data-action="abrir-cajeros" class="bg-blue-600 hover:bg-blue-700 text-xs px-3 py-2 rounded-lg font-semibold shadow">👥 Mi caja</button>
                 <button type="button" id="btn-cambiar-modo" data-action="acceso-dueno" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">🔒 Dueño</button>
                 <button type="button" data-action="abrir-cuenta" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">👤 Cuenta</button>
                 <button type="button" data-action="cerrar-sesion" class="bg-indigo-700 dark:bg-indigo-800 text-xs px-3 py-2 rounded-lg font-semibold">Salir</button>
@@ -241,10 +263,10 @@
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <div>
                         <h2 class="text-xl font-semibold text-amber-700 dark:text-amber-400">👥 Control de Asistencia y Turnos</h2>
-                        <p class="text-xs text-slate-500">Cronómetro en vivo del tiempo transcurrido de cada trabajador en turno. Cada cajero entra con su PIN.</p>
+                        <p class="text-xs text-slate-500">Cada cajero crea su propia cuenta desde la pantalla de inicio y elige su PIN personal (tú no lo ves). Aquí aprobas sus solicitudes y controlas su turno.</p>
                     </div>
-                    <button type="button" data-action="nuevo-empleado" class="bg-emerald-600 text-white text-xs px-3 py-2.5 rounded-lg font-bold">+ Añadir Trabajador</button>
                 </div>
+                <div id="solicitudes-empleados" class="hidden mb-4"></div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
@@ -508,10 +530,10 @@
     <!-- Selección de cajero -->
     <div id="modal-seleccion-cajero" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
         <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
-            <h3 class="text-lg font-bold">👥 Seleccionar Cajero Activo</h3>
+            <h3 class="text-lg font-bold">👥 Mi caja</h3>
             <div id="lista-modal-cajeros" class="space-y-2 max-h-56 overflow-y-auto"></div>
-            <p class="text-[11px] text-slate-500">🔑 = cambiar tu propio PIN.</p>
-            <button type="button" id="btn-quitar-cajero" data-action="quitar-cajero" class="hidden w-full bg-amber-100 text-amber-900 py-2.5 rounded-lg text-xs font-bold">Salir de mi turno de caja</button>
+            <p class="text-[11px] text-slate-500">Tu PIN es personal: el dueño no puede verlo, solo reiniciarlo si lo olvidas.</p>
+            <button type="button" id="btn-quitar-cajero" data-action="quitar-cajero" class="hidden w-full bg-amber-100 text-amber-900 py-2.5 rounded-lg text-xs font-bold">🔒 Bloquear mi caja (pedirá mi PIN)</button>
             <button type="button" data-action="cerrar-modal" data-modal="modal-seleccion-cajero" class="w-full bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs">Cancelar</button>
         </div>
     </div>
@@ -676,21 +698,6 @@
     </div>
 
     <!-- Trabajador (nuevo / cambiar PIN) -->
-    <div id="modal-empleado" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
-        <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-3 shadow-2xl">
-            <h3 class="text-lg font-bold" id="empleado-modal-titulo">👤 Nuevo Trabajador</h3>
-            <input type="hidden" id="empleado-id">
-            <input type="text" id="empleado-nombre" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900 disabled:opacity-60" placeholder="Nombre">
-            <input type="password" id="empleado-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" class="w-full border dark:border-slate-700 rounded-lg p-2.5 text-sm dark:bg-slate-900" placeholder="PIN (4 a 8 dígitos)">
-            <p id="empleado-error" class="hidden text-xs text-red-600 font-semibold"></p>
-            <div class="flex space-x-2 pt-2">
-                <button type="button" data-action="cerrar-modal" data-modal="modal-empleado" class="w-1/2 bg-slate-200 dark:bg-slate-700 py-2.5 rounded-lg text-xs font-semibold">Cancelar</button>
-                <button type="button" data-action="guardar-empleado" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-xs font-bold">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Mi cuenta -->
     <div id="modal-cuenta" class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 no-print">
         <div class="modal-caja bg-white dark:bg-slate-800 rounded-xl max-w-sm w-full p-6 space-y-3 shadow-2xl max-h-[92vh] overflow-y-auto">
             <h3 class="text-lg font-bold">👤 Mi cuenta</h3>

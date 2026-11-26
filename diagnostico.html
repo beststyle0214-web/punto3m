@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba de conexión · Punto 3 M</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: #0f172a; color: #e2e8f0; line-height: 1.5; }
+    main { max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; }
+    .caja { background: #1e293b; border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+    .ok { color: #34d399; } .mal { color: #f87171; } .esp { color: #fbbf24; }
+    code { font-size: .8rem; color: #94a3b8; word-break: break-all; }
+    button { background: #4f46e5; color: #fff; border: 0; border-radius: 10px; padding: 12px 18px; font-size: 1rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🔧 Prueba de conexión</h1>
+  <p>Esta página comprueba, paso a paso, si tu teléfono puede hablar con Firebase <b>sin VPN</b>.</p>
+  <p><button id="ir">Empezar la prueba</button></p>
+  <div id="salida"></div>
+  <p><a href="./" style="color:#a5b4fc">← Volver a Punto 3 M</a></p>
+</main>
+<script type="module">
+  import { firebaseConfig, PROXY_URL } from './config.js';
+  const salida = document.getElementById('salida');
+  const proxy = (PROXY_URL || '').trim().replace(/\/+$/, '');
+
+  function fila(texto) {
+    const d = document.createElement('div');
+    d.className = 'caja';
+    d.innerHTML = `<span class="esp">⏳</span> ${texto}`;
+    salida.appendChild(d);
+    return (clase, simbolo, detalle) => {
+      d.innerHTML = `<span class="${clase}">${simbolo}</span> ${texto}${detalle ? `<br><code>${detalle}</code>` : ''}`;
+    };
+  }
+
+  async function llamar(url, opciones = {}) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 15000);
+    try {
+      const r = await fetch(url, { ...opciones, signal: ctl.signal });
+      const cuerpo = (await r.text()).slice(0, 140).replace(/\s+/g, ' ');
+      return { estado: r.status, cuerpo };
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  async function probar() {
+    salida.innerHTML = '';
+    if (!proxy) {
+      fila('Esta versión de la app todavía <b>no tiene configurado el intermediario</b> (PROXY_URL vacío).')('mal', '❌');
+      return;
+    }
+    fila(`Intermediario configurado: <code>${proxy}</code>`)('ok', '✅');
+
+    let f = fila('1. ¿Abre el intermediario de Cloudflare?');
+    try {
+      const r = await llamar(`${proxy}/ping`);
+      r.estado === 200 ? f('ok', '✅', r.cuerpo) : f('mal', '❌', `Respuesta ${r.estado}: ${r.cuerpo}`);
+    } catch (e) {
+      f('mal', '❌', `No se pudo conectar (${e.name}). Revisa la dirección o la señal.`);
+      return;
+    }
+
+    f = fila('2. ¿Llega al inicio de sesión de Google (a través del intermediario)?');
+    try {
+      const r = await llamar(`${proxy}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'prueba@ejemplo.com', password: 'x', returnSecureToken: true }),
+      });
+      // Google contesta 400 con un mensaje JSON (correo o clave incorrectos): eso es BUENO, llegó a Google.
+      /"error"/.test(r.cuerpo) && r.estado !== 403
+        ? f('ok', '✅', `Google respondió (${r.estado}): ${r.cuerpo}`)
+        : f('mal', '❌', `Respuesta ${r.estado}: ${r.cuerpo}`);
+    } catch (e) {
+      f('mal', '❌', `Falló (${e.name}).`);
+    }
+
+    f = fila('3. ¿Llega a la base de datos de Google (a través del intermediario)?');
+    try {
+      const r = await llamar(`${proxy}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config/general?key=${firebaseConfig.apiKey}`);
+      // Sin sesión, Google contesta 401/403 con JSON "PERMISSION_DENIED"/"UNAUTHENTICATED": también es BUENO.
+      /PERMISSION_DENIED|UNAUTHENTICATED|"error"/.test(r.cuerpo) && !/<html/i.test(r.cuerpo)
+        ? f('ok', '✅', `Google respondió (${r.estado}): ${r.cuerpo}`)
+        : f('mal', '❌', `Respuesta ${r.estado}: ${r.cuerpo}`);
+    } catch (e) {
+      f('mal', '❌', `Falló (${e.name}).`);
+    }
+
+    fila('Si los 3 pasos salieron ✅, ya puedes entrar a Punto 3 M <b>sin VPN</b>.')('ok', '🎉');
+  }
+
+  document.getElementById('ir').addEventListener('click', probar);
+</script>
+</body>
+</html>

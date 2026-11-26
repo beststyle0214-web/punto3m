@@ -20,3 +20,8 @@ export const UMBRAL_STOCK_BAJO = 5;
 export const TELEFONO_REPORTE = '+5353463594';
 export const DIAS_CIERRES = 30; // cuántos días atrás se listan los turnos cerrados
 export const LADO_FOTO = 256; // las fotos de productos se reducen a 256×256 px
+
+// Intermediario (Cloudflare Worker) para usar la app SIN VPN desde Cuba: Google bloquea sus servidores
+// de datos y de inicio de sesión (error 403) desde allí, y el intermediario los llama desde fuera.
+// Déjalo vacío ('') para conectar directo a Google. Ejemplo: 'https://p3m-proxy.tunombre.workers.dev'
+export const PROXY_URL = 'https://p3m-proxy.beststyle0214.workers.dev';
