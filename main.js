@@ -506,6 +506,13 @@ const acciones = {
   'carga-accion': () => accionCarga && accionCarga(),
   imprimir: () => window.print(),
   'modo-oscuro': alternarModoOscuro,
+  'probar-sync': async () => {
+    toast('Probando conexión con el servidor…', 'info');
+    const r = await datos.probarServidor();
+    const pend = estado.pendientes ? `\n\nVentas guardadas solo en este teléfono: ${estado.pendientes}. Se enviarán solas cuando haya conexión.` : '';
+    if (r.ok) avisar(`✅ Hay conexión con el servidor (${r.ms} ms).${pend}`, 'Sincronización');
+    else avisar(`❌ No hay conexión con el servidor.\nCódigo: ${r.codigo}\n${String(r.mensaje).slice(0, 140)}${pend}\n\nSi es la primera vez: borra los datos del sitio en Chrome y vuelve a entrar.`, 'Sincronización');
+  },
   'abrir-menu': abrirMenu,
   'cerrar-menu': cerrarMenu,
   'tab-dueno': (d) => irPestana(d.tab),

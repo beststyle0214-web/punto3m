@@ -401,6 +401,18 @@ export function eliminarEmpleado(id) {
 // ---- PIN personal (la huella del PIN vive aparte, donde solo la lee su propio cajero)
 
 /** Lee el PIN guardado de este cajero ({ sal, pinHash } o null). Sin internet usa la copia del aparato. */
+/** Prueba si el teléfono habla con el servidor ahora mismo (sin usar la copia guardada). */
+export async function probarServidor() {
+  const t = Date.now();
+  try {
+    await conTiempo(col('config').doc('general').get({ source: 'server' }), 12000);
+    return { ok: true, ms: Date.now() - t };
+  } catch (e) {
+    // "permission-denied" también prueba que se llegó al servidor
+    return { ok: !!e && e.code === 'permission-denied', ms: Date.now() - t, codigo: (e && (e.code || e.name)) || 'desconocido', mensaje: (e && e.message) || '' };
+  }
+}
+
 /** Pregunta DIRECTO al servidor (sin usar la copia guardada en el teléfono). */
 export async function perfilDelServidor(uid) {
   const s = await conTiempo(col('empleados').doc(uid).get({ source: 'server' }), 10000);
