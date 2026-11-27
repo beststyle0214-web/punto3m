@@ -401,6 +401,12 @@ export function eliminarEmpleado(id) {
 // ---- PIN personal (la huella del PIN vive aparte, donde solo la lee su propio cajero)
 
 /** Lee el PIN guardado de este cajero ({ sal, pinHash } o null). Sin internet usa la copia del aparato. */
+/** Pregunta DIRECTO al servidor (sin usar la copia guardada en el teléfono). */
+export async function perfilDelServidor(uid) {
+  const s = await conTiempo(col('empleados').doc(uid).get({ source: 'server' }), 10000);
+  return s.exists ? mapearEmpleado(s.id, s.data()) : null;
+}
+
 export async function leerPin(uid) {
   const ref = col('pins').doc(uid);
   let s;

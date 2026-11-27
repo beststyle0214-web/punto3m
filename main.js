@@ -15,7 +15,7 @@ import {
   teclaCodigoBarras, calcularVueltoEnVivo, teclaCobro, calcularTotalArqueo,
 } from './pos.js';
 import {
-  renderAdmin, accionesAdmin, actualizarCronometros, renderInventario, renderHistorial, importarRespaldo,
+  renderAdmin, renderMercancia, etiquetarTablas, accionesAdmin, actualizarCronometros, renderInventario, renderHistorial, importarRespaldo,
   cargarFoto, cambioFormularioProducto,
 } from './admin.js';
 import { accionesCuenta, guardarPromptInstalacion, appInstalada, renderCuenta } from './cuenta.js';
@@ -350,16 +350,44 @@ function perfilCambio(perfil) {
   }
   if (!perfil.aprobado && perfil.enviando) {
     pararDatos();
-    return setCarga('📤 Enviando tu solicitud al dueño… Necesita internet. No cierres la app hasta que cambie este mensaje.', true);
+    return setCarga(
+      '📤 Enviando tu solicitud al dueño… Necesita internet. No cierres la app hasta que cambie este mensaje.',
+      true,
+      { texto: '🔄 Comprobar ahora', fn: comprobarAhora },
+    );
   }
   if (!perfil.aprobado) {
     pararDatos();
     return setCarga(
       `⏳ ${perfil.nombre}, tu cuenta está esperando la aprobación del dueño. Cuando la apruebe, esta pantalla se abrirá sola.`,
       true,
+      { texto: '🔄 Comprobar ahora', fn: comprobarAhora },
     );
   }
   arrancarDatos();
+}
+
+/** Pregunta al servidor si ya te aprobaron; si no hay conexión, dice cuál es el problema. */
+async function comprobarAhora() {
+  if (!estado.user) return;
+  setCarga('Preguntando al servidor…', true);
+  try {
+    const perfil = await datos.perfilDelServidor(estado.user.uid);
+    if (!perfil) return setCarga('El servidor no tiene tu solicitud. Toca "Cerrar sesión" y crea la cuenta otra vez.', true);
+    if (!perfil.aprobado) {
+      return setCarga(`⏳ El servidor responde: todavía no te aprobaron (conexión OK). Pídele al dueño que te apruebe.`, true, {
+        texto: '🔄 Comprobar ahora',
+        fn: comprobarAhora,
+      });
+    }
+    perfilCambio(perfil);
+  } catch (e) {
+    const causa = e && e.code === 'permission-denied' ? 'las reglas de Firebase rechazaron la lectura' : 'no hay conexión con el servidor';
+    setCarga(`❌ No se pudo comprobar: ${causa}${e && e.code ? ` (${e.code})` : ''}. Revisa tu internet y vuelve a intentar.`, true, {
+      texto: '🔄 Comprobar ahora',
+      fn: comprobarAhora,
+    });
+  }
 }
 
 function falloPerfil(e) {
@@ -524,6 +552,8 @@ $('input-codigo-barras').addEventListener('keydown', teclaCodigoBarras);
 $('input-efectivo-recibido').addEventListener('input', calcularVueltoEnVivo);
 $('input-efectivo-recibido').addEventListener('keydown', teclaCobro);
 $('input-buscador-inventario').addEventListener('input', renderInventario);
+$('buscar-mercancia').addEventListener('input', () => { renderMercancia(); etiquetarTablas(); });
+$('orden-mercancia').addEventListener('change', () => { renderMercancia(); etiquetarTablas(); });
 $('filtro-historial-cajero').addEventListener('change', renderHistorial);
 $('input-importar').addEventListener('change', importarRespaldo);
 

@@ -313,7 +313,19 @@ function tarjetasMercancia(t) {
 }
 
 export function renderMercancia() {
-  const { filas, total } = cuadreMercancia();
+  const { filas: todas, total } = cuadreMercancia();
+  const filtro = normalizar($('buscar-mercancia').value.trim());
+  const porId = new Map(estado.productos.map((p) => [p.id, p]));
+  const cat = (f) => (porId.get(f.id) || {}).categoria || '';
+  const filas = todas.filter((f) => !filtro || normalizar(f.nombre).includes(filtro) || normalizar(cat(f)).includes(filtro));
+  const orden = $('orden-mercancia').value;
+  const criterios = {
+    categoria: (a, b) => cat(a).localeCompare(cat(b), 'es') || a.nombre.localeCompare(b.nombre, 'es'),
+    vendido: (a, b) => b.vendido + b.merma - (a.vendido + a.merma),
+    queda: (a, b) => a.queda - b.queda,
+    dif: (a, b) => Math.abs(b.sinExplicar) - Math.abs(a.sinExplicar),
+  };
+  if (criterios[orden]) filas.sort(criterios[orden]);
   const html = tarjetasMercancia(total);
   $('merc-resumen').innerHTML = html;
   $('merc-resumen-detalle').innerHTML = html;
@@ -332,7 +344,7 @@ export function renderMercancia() {
             <td class="p-3">${dif}</td></tr>`;
         })
         .join('')
-    : '<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">Aún no hay productos.</td></tr>';
+    : `<tr><td colspan="6" class="p-4 text-center text-slate-400 italic">${filtro ? 'Ningún producto coincide con la búsqueda.' : 'Aún no hay productos.'}</td></tr>`;
 }
 
 async function copiarMercancia() {

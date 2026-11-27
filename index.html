@@ -349,6 +349,16 @@
                         <p class="text-xs text-slate-500 dark:text-slate-400">Entregado = lo que había al abrir el turno (más lo que se reabasteció). Al cerrar el turno, lo que queda pasa a ser lo entregado del siguiente.</p>
                     </div>
                     <div id="merc-resumen-detalle" class="grid grid-cols-3 gap-2 text-center"></div>
+                    <div class="flex flex-wrap gap-2">
+                        <input type="search" id="buscar-mercancia" placeholder="🔍 Buscar producto por nombre o categoría..." autocomplete="off" class="flex-1 min-w-[180px] border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm">
+                        <select id="orden-mercancia" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-2 py-2.5 text-sm" aria-label="Ordenar">
+                            <option value="nombre">Orden: A → Z</option>
+                            <option value="categoria">Por categoría</option>
+                            <option value="vendido">Más vendidos primero</option>
+                            <option value="queda">Menos que quedan primero</option>
+                            <option value="dif">Con diferencia primero</option>
+                        </select>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="tabla-movil w-full text-left text-sm">
                             <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700">
