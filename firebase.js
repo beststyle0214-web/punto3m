@@ -26,7 +26,7 @@ if (proxy) {
 // atraviesa cualquier red; sin él, "AutoDetectLongPolling" cambia solo cuando hace falta.
 // "ignoreUndefinedProperties" evita que un campo vacío haga fallar todo el guardado.
 try {
-  const ajustes = { ignoreUndefinedProperties: true, merge: true };
+  const ajustes = { ignoreUndefinedProperties: true };
   if (proxy) {
     ajustes.host = new URL(proxy).host;
     ajustes.ssl = true;
@@ -41,6 +41,20 @@ try {
 
 // Caché local: la app abre y puede vender aunque se caiga el internet;
 // las escrituras quedan en cola y se envían al reconectar.
-db.enablePersistence({ synchronizeTabs: false }).catch((e) => {
-  console.warn('Modo offline no disponible en este navegador:', e.code);
-});
+// (Para diagnóstico: abrir la app con ?sinlocal=1 la desactiva.)
+export const copiaLocal = !/[?&]sinlocal=1/.test(location.search);
+if (copiaLocal) {
+  db.enablePersistence({ synchronizeTabs: false }).catch((e) => {
+    console.warn('Modo offline no disponible en este navegador:', e.code);
+  });
+}
+
+/** Lo que realmente usa Firestore ahora (para el diagnóstico). */
+export function ajustesActuales() {
+  try {
+    const a = db._delegate._getSettings();
+    return `host=${a.host} ssl=${a.ssl} longPolling=${!!a.experimentalForceLongPolling}`;
+  } catch (e) {
+    return 'no se pudo leer';
+  }
+}

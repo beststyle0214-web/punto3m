@@ -510,7 +510,7 @@ const acciones = {
     toast('Probando conexión con el servidor… (hasta 25 s)', 'info');
     const r = await datos.probarServidor();
     const pend = estado.pendientes ? `\nVentas guardadas solo en este teléfono: ${estado.pendientes}. Se enviarán solas cuando haya conexión.` : '';
-    const detalle = `\n\nIntermediario: ${r.info.proxy}\nPetición normal: ${r.info.peticion}`;
+    const detalle = `\n\nIntermediario: ${r.info.proxy}\nPetición normal: ${r.info.peticion}\nFirestore usa: ${r.info.ajustes}\nCopia local: ${r.info.copiaLocal}`;
     if (r.ok) avisar(`✅ Hay conexión con el servidor (${r.ms} ms).${detalle}${pend}`, 'Sincronización');
     else avisar(`❌ El canal en vivo no conecta.\nCódigo: ${r.codigo}${detalle}${pend}`, 'Sincronización');
   },

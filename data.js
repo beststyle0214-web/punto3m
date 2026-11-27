@@ -16,7 +16,7 @@
 // El stock se cambia con FieldValue.increment(): dos cajas vendiendo a la vez
 // no se pisan (antes ganaba la última en guardar el inventario completo).
 
-import { db, auth, FieldValue } from './firebase.js';
+import { db, auth, FieldValue, copiaLocal, ajustesActuales } from './firebase.js';
 import { estado } from './estado.js';
 import { aMillis, fotoValida, conTiempo } from './utils.js';
 import { CATEGORIAS_POR_DEFECTO, TASAS_POR_DEFECTO, DIAS_CIERRES, PROXY_URL, firebaseConfig } from './config.js';
@@ -405,7 +405,7 @@ export function eliminarEmpleado(id) {
 export async function probarServidor() {
   const t = Date.now();
   const proxy = (PROXY_URL || '').trim().replace(/\/+$/, '');
-  const info = { proxy: proxy || '(vacío: no hay intermediario)' };
+  const info = { proxy: proxy || '(vacío: no hay intermediario)', ajustes: ajustesActuales(), copiaLocal: copiaLocal ? 'sí' : 'no' };
   // 1) Reinicia la conexión (por si quedó en una espera larga después de fallar)
   try {
     await db.disableNetwork();
