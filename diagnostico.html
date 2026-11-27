@@ -20,6 +20,13 @@
   <p>Esta página comprueba, paso a paso, si tu teléfono puede hablar con Firebase <b>sin VPN</b>.</p>
   <p><button id="ir">Empezar la prueba</button></p>
   <div id="salida"></div>
+
+  <h2 style="font-size:1.1rem;margin-top:28px">🔬 Prueba avanzada (datos reales)</h2>
+  <p style="font-size:.9rem">Sirve para ver por qué <b>no se sincroniza</b> sin VPN. Escribe tu correo y contraseña de siempre (no se guardan). Tarda ~1 minuto.</p>
+  <p><input id="av-correo" type="email" placeholder="Correo" autocomplete="username" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:0;margin-bottom:8px">
+  <input id="av-clave" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:0"></p>
+  <p><button id="av-ir">Empezar prueba avanzada</button></p>
+  <div id="salida2"></div>
   <p><a href="./" style="color:#a5b4fc">← Volver a Punto 3 M</a></p>
 </main>
 <script type="module">
@@ -96,6 +103,106 @@
   }
 
   document.getElementById('ir').addEventListener('click', probar);
+
+  // ------------------------------------------------ prueba avanzada con el SDK real de Firebase
+  const salida2 = document.getElementById('salida2');
+  function fila2(texto) {
+    const d = document.createElement('div');
+    d.className = 'caja';
+    d.innerHTML = `<span class="esp">⏳</span> ${texto}`;
+    salida2.appendChild(d);
+    return (clase, simbolo, detalle) => {
+      d.innerHTML = `<span class="${clase}">${simbolo}</span> ${texto}${detalle ? `<br><code>${detalle}</code>` : ''}`;
+    };
+  }
+  const cargarScript = (src) =>
+    new Promise((ok, mal) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = ok;
+      el.onerror = () => mal(new Error('no cargó ' + src));
+      document.head.appendChild(el);
+    });
+  const conLimite = (p, ms, nombre) =>
+    Promise.race([p, new Promise((_, r) => setTimeout(() => r(Object.assign(new Error('tiempo agotado'), { code: 'tiempo-agotado:' + nombre })), ms))]);
+  const alcanzoGoogle = (e) => e && ['permission-denied', 'unauthenticated'].includes(e.code);
+
+  const VARIANTES = [
+    ['A. Peticiones normales (long polling forzado) — lo que usa la app ahora', { experimentalForceLongPolling: true }],
+    ['B. Flujo directo (streaming del navegador)', {}],
+    ['C. Automático', { experimentalAutoDetectLongPolling: true }],
+  ];
+
+  async function pruebaAvanzada() {
+    salida2.innerHTML = '';
+    const correo = document.getElementById('av-correo').value.trim();
+    const clave = document.getElementById('av-clave').value;
+    if (!proxy) return fila2('Falta PROXY_URL')('mal', '❌');
+    if (!correo || !clave) return fila2('Escribe tu correo y contraseña arriba.')('mal', '❌');
+    let f = fila2('Cargando el SDK de Firebase');
+    try {
+      const base = 'https://www.gstatic.com/firebasejs/10.8.0/';
+      await cargarScript(base + 'firebase-app-compat.js');
+      await Promise.all([cargarScript(base + 'firebase-auth-compat.js'), cargarScript(base + 'firebase-firestore-compat.js')]);
+      f('ok', '✅');
+    } catch (e) {
+      return f('mal', '❌', e.message);
+    }
+    for (const [nombre, ajustes] of VARIANTES) {
+      fila2(`<b>${nombre}</b>`)('esp', '▶️');
+      const app = firebase.initializeApp(firebaseConfig, 'v' + Math.random().toString(36).slice(2));
+      try {
+        const auth = app.auth();
+        auth.useEmulator(proxy, { disableWarnings: true });
+        let t0 = Date.now();
+        f = fila2('Iniciar sesión');
+        try {
+          await conLimite(auth.signInWithEmailAndPassword(correo, clave), 15000, 'login');
+          f('ok', '✅', `${Date.now() - t0} ms`);
+        } catch (e) {
+          f('mal', '❌', `${e.code || e.name}: ${e.message}`.slice(0, 160));
+          continue;
+        }
+        const db = app.firestore();
+        db.settings({ host: new URL(proxy).host, ssl: true, ignoreUndefinedProperties: true, ...ajustes });
+        t0 = Date.now();
+        f = fila2('Leer un dato directo del servidor');
+        try {
+          await conLimite(db.collection('config').doc('general').get({ source: 'server' }), 15000, 'leer');
+          f('ok', '✅', `${Date.now() - t0} ms`);
+        } catch (e) {
+          alcanzoGoogle(e) ? f('ok', '✅', `Llegó a Google (${e.code}) en ${Date.now() - t0} ms`) : f('mal', '❌', `${e.code || e.name}: ${(e.message || '').slice(0, 120)}`);
+        }
+        t0 = Date.now();
+        f = fila2('Recibir cambios en vivo (espera hasta 15 s)');
+        await new Promise((fin) => {
+          const parar = db.collection('config').doc('general').onSnapshot(
+            { includeMetadataChanges: true },
+            (snap) => {
+              if (!snap.metadata.fromCache) {
+                f('ok', '✅', `Datos del servidor en ${Date.now() - t0} ms`);
+                parar();
+                fin();
+              }
+            },
+            (e) => {
+              alcanzoGoogle(e) ? f('ok', '✅', `Llegó a Google (${e.code})`) : f('mal', '❌', `${e.code}: ${(e.message || '').slice(0, 120)}`);
+              fin();
+            },
+          );
+          setTimeout(() => {
+            f('mal', '❌', 'Sin respuesta del servidor en 15 s (solo se vio la copia guardada).');
+            parar();
+            fin();
+          }, 15000);
+        });
+      } finally {
+        try { await app.delete(); } catch (e) { /* nada */ }
+      }
+    }
+    fila2('Fin. Haz captura de toda esta sección y mándamela.')('ok', '🏁');
+  }
+  document.getElementById('av-ir').addEventListener('click', pruebaAvanzada);
 </script>
 </body>
 </html>
