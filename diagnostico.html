@@ -148,6 +148,30 @@
     } catch (e) {
       return f('mal', '❌', e.message);
     }
+    // Prueba directa del canal de Firestore a través del intermediario (sin SDK)
+    f = fila2('Canal de Firestore: pedir una conexión a Google a través del intermediario');
+    try {
+      const url = `${proxy}/google.firestore.v1.Firestore/Listen/channel?database=${encodeURIComponent(`projects/${firebaseConfig.projectId}/databases/(default)`)}&VER=8&RID=1&CVER=22&X-HTTP-Session-Id=gsessionid&zx=prueba&t=1`;
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'count=0', signal: ctl.signal });
+      clearTimeout(t);
+      const cuerpo = (await r.text()).slice(0, 160).replace(/\s+/g, ' ');
+      f(r.status < 500 ? 'ok' : 'mal', r.status < 500 ? '✅' : '❌', `HTTP ${r.status} · ${r.headers.get('content-type') || 'sin tipo'} · ${cuerpo}`);
+    } catch (e) {
+      f('mal', '❌', `${e.name}: ${e.message}`);
+    }
+
+    // Guarda lo que cuenta el SDK sobre su conexión para mostrar el motivo real
+    const registro = [];
+    firebase.setLogLevel('debug');
+    for (const m of ['log', 'info', 'warn', 'error', 'debug']) {
+      const original = console[m].bind(console);
+      console[m] = (...args) => {
+        try { registro.push(args.map((x) => (typeof x === 'string' ? x : x && x.message ? x.message : JSON.stringify(x))).join(' ').slice(0, 220)); } catch (e) { /* nada */ }
+        original(...args);
+      };
+    }
     for (const [nombre, ajustes] of VARIANTES) {
       fila2(`<b>${nombre}</b>`)('esp', '▶️');
       const app = firebase.initializeApp(firebaseConfig, 'v' + Math.random().toString(36).slice(2));
@@ -197,6 +221,9 @@
           }, 15000);
         });
       } finally {
+        const utiles = registro.filter((l) => /webchannel|stream|transport|error|offline|fail|closed|rpc/i.test(l));
+        if (utiles.length) fila2('Lo que dice el SDK (últimas líneas)')('esp', '📜', utiles.slice(-8).join('<br>').replace(/</g, '&lt;').replace(/&lt;br>/g, '<br>'));
+        registro.length = 0;
         try { await app.delete(); } catch (e) { /* nada */ }
       }
     }
