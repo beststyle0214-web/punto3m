@@ -164,7 +164,26 @@
 
     // Guarda lo que cuenta el SDK sobre su conexión para mostrar el motivo real
     const registro = [];
-    firebase.setLogLevel('debug');
+    try { firebase.firestore.setLogLevel('debug'); } catch (e) { /* nada */ }
+    // Espía las peticiones de red que hace el SDK hacia el intermediario
+    const abrir = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function (m, u, ...r) {
+      this.__info = `${m} ${String(u).replace(proxy, '').split('?')[0]}${/TYPE=xmlhttp/.test(u) ? ' (escucha)' : ''}`;
+      this.addEventListener('loadend', () => registro.push(`NET XHR ${this.__info} -> ${this.status || 'FALLÓ'} ${(this.responseText || '').slice(0, 70).replace(/\s+/g, ' ')}`));
+      return abrir.call(this, m, u, ...r);
+    };
+    const traer = window.fetch;
+    window.fetch = async function (u, o) {
+      const nombreU = String(u && u.url ? u.url : u).replace(proxy, '').split('?')[0];
+      try {
+        const r = await traer.call(this, u, o);
+        registro.push(`NET fetch ${nombreU} -> ${r.status}`);
+        return r;
+      } catch (e) {
+        registro.push(`NET fetch ${nombreU} -> FALLÓ ${e.name}: ${e.message}`);
+        throw e;
+      }
+    };
     for (const m of ['log', 'info', 'warn', 'error', 'debug']) {
       const original = console[m].bind(console);
       console[m] = (...args) => {
@@ -221,8 +240,8 @@
           }, 15000);
         });
       } finally {
-        const utiles = registro.filter((l) => /webchannel|stream|transport|error|offline|fail|closed|rpc/i.test(l));
-        if (utiles.length) fila2('Lo que dice el SDK (últimas líneas)')('esp', '📜', utiles.slice(-8).join('<br>').replace(/</g, '&lt;').replace(/&lt;br>/g, '<br>'));
+        const utiles = registro.filter((l) => /^NET|webchannel|stream|transport|error|offline|fail|closed|rpc/i.test(l));
+        if (utiles.length) fila2('Lo que dice el SDK (últimas líneas)')('esp', '📜', utiles.slice(-14).map((l) => l.slice(0, 170)).join('<br>').replace(/</g, '&lt;').replace(/&lt;br>/g, '<br>'));
         registro.length = 0;
         try { await app.delete(); } catch (e) { /* nada */ }
       }
