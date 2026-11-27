@@ -82,7 +82,8 @@ const textoCaja = () => {
   if (r.caja.CUP) partes.push(`${r.caja.CUP} CUP`);
   if (r.caja.USD) partes.push(`${fmtMinor(r.caja.USD, 'USD')}`);
   if (r.caja.MLC) partes.push(`${fmtMinor(r.caja.MLC, 'MLC')}`);
-  return `Caja del turno: ${partes.join(' + ') || '0'} · ${r.tickets} ventas`;
+  const tr = [r.transf.CUP && `${r.transf.CUP} CUP`, r.transf.USD && fmtMinor(r.transf.USD, 'USD'), r.transf.MLC && fmtMinor(r.transf.MLC, 'MLC')].filter(Boolean);
+  return `Caja del turno: ${partes.join(' + ') || '0'}${tr.length ? ` · transferencias: ${tr.join(' + ')}` : ''} · ${r.tickets} ventas`;
 };
 
 /** Recibe los eventos de data.js. Solo la cuenta del dueño recibe avisos. */
@@ -93,7 +94,7 @@ export function manejarEvento(ev) {
     if (ev.ventas.length === 1) {
       const v = ev.ventas[0];
       const detalle = v.items.map((i) => `${i.cantidad}× ${i.nombre}`).join(', ');
-      avisar(`💰 Venta: ${fmtMinor(v.cobrado, v.moneda)}`, `${v.cajero || ''} — ${detalle}. ${textoCaja()}`, 'venta', 'ok');
+      avisar(`💰 Venta: ${fmtMinor(v.cobrado, v.moneda)}${v.transferencia ? ` (🏦 ${fmtMinor(v.transferencia, v.moneda)} por transferencia)` : ''}`, `${v.cajero || ''} — ${detalle}. ${textoCaja()}`, 'venta', 'ok');
     } else {
       const usd = ev.ventas.reduce((s, v) => s + v.totalUSD, 0);
       avisar(`💰 ${ev.ventas.length} ventas nuevas`, `Suman ${fmtUSD(usd)} USD. ${textoCaja()}`, 'venta', 'ok');

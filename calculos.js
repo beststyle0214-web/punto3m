@@ -16,6 +16,11 @@ const perdidaCup = (m, tasa) =>
 
 const cajaVacia = () => ({ USD: 0, MLC: 0, CUP: 0 });
 
+/** Lo que de una venta se pagó por transferencia (no entra a la gaveta). Las ventas viejas no la traen. */
+export const transferenciaVenta = (v) => Math.min(v.cobrado || 0, Math.max(0, v.transferencia || 0));
+/** Lo que de una venta se pagó en efectivo (esto sí entra a la gaveta). */
+export const efectivoVenta = (v) => (v.cobrado || 0) - transferenciaVenta(v);
+
 /**
  * @param ventas     tickets del turno
  * @param mermas     mermas del turno
@@ -24,6 +29,7 @@ const cajaVacia = () => ({ USD: 0, MLC: 0, CUP: 0 });
  */
 export function resumenTurno({ ventas, mermas, categorias, tasaUSD = TASA_DEFECTO }) {
   const caja = cajaVacia();
+  const transf = cajaVacia();
   const porCat = new Map(categorias.map((c) => [c, { usd: 0, cup: 0 }]));
   const porCajero = new Map();
   let ventasUSD = 0;
@@ -34,7 +40,8 @@ export function resumenTurno({ ventas, mermas, categorias, tasaUSD = TASA_DEFECT
   let gastosCUP = 0;
 
   for (const v of ventas) {
-    caja[v.moneda] = (caja[v.moneda] || 0) + v.cobrado; // el vuelto ya sale del cobrado
+    caja[v.moneda] = (caja[v.moneda] || 0) + efectivoVenta(v); // el vuelto ya sale del cobrado
+    transf[v.moneda] = (transf[v.moneda] || 0) + transferenciaVenta(v);
     const cup = cupVenta(v, tasaUSD);
     ventasUSD += v.totalUSD;
     ventasCUP += cup;
@@ -43,13 +50,14 @@ export function resumenTurno({ ventas, mermas, categorias, tasaUSD = TASA_DEFECT
 
     const clave = v.cajeroId || v.cajero || '—';
     if (!porCajero.has(clave)) {
-      porCajero.set(clave, { cajero: v.cajero || '—', tickets: 0, ventasUSD: 0, ventasCUP: 0, caja: cajaVacia() });
+      porCajero.set(clave, { cajero: v.cajero || '—', tickets: 0, ventasUSD: 0, ventasCUP: 0, caja: cajaVacia(), transf: cajaVacia() });
     }
     const pc = porCajero.get(clave);
     pc.tickets++;
     pc.ventasUSD += v.totalUSD;
     pc.ventasCUP += cup;
-    pc.caja[v.moneda] = (pc.caja[v.moneda] || 0) + v.cobrado;
+    pc.caja[v.moneda] = (pc.caja[v.moneda] || 0) + efectivoVenta(v);
+    pc.transf[v.moneda] = (pc.transf[v.moneda] || 0) + transferenciaVenta(v);
 
     for (const i of v.items) {
       if (!porCat.has(i.categoria)) porCat.set(i.categoria, { usd: 0, cup: 0 });
@@ -65,6 +73,7 @@ export function resumenTurno({ ventas, mermas, categorias, tasaUSD = TASA_DEFECT
 
   return {
     caja,
+    transf,
     tickets: ventas.length,
     ventasUSD,
     ventasCUP,
@@ -106,8 +115,12 @@ export function ventasDeCajero(ventas, cajeroId, desdeTs) {
 /** Lo que debería haber en la gaveta según esas ventas (por moneda). */
 export function esperadoArqueo(ventasCajero) {
   const caja = cajaVacia();
-  for (const v of ventasCajero) caja[v.moneda] = (caja[v.moneda] || 0) + v.cobrado;
-  return { caja, tickets: ventasCajero.length };
+  const transf = cajaVacia();
+  for (const v of ventasCajero) {
+    caja[v.moneda] = (caja[v.moneda] || 0) + efectivoVenta(v);
+    transf[v.moneda] = (transf[v.moneda] || 0) + transferenciaVenta(v);
+  }
+  return { caja, transf, tickets: ventasCajero.length };
 }
 
 /** Diferencia de arqueo: contado - esperado (positivo = sobra, negativo = falta). */
@@ -144,6 +157,7 @@ export function rangoReporte(modo, ahora = Date.now()) {
   const lunes = enDias(hoy, -((new Date(hoy).getDay() + 6) % 7));
   if (modo === 'semana') return { desde: lunes, hasta: ahora };
   if (modo === 'pasada') return { desde: enDias(lunes, -7), hasta: lunes - 1 };
+  if (modo === 'ultimos30') return { desde: enDias(hoy, -29), hasta: ahora };
   return { desde: enDias(hoy, -6), hasta: ahora, _dia: dia };
 }
 
@@ -179,11 +193,13 @@ export function reportePeriodo({ ventas, mermas = [], desde, hasta, tasaUSD = TA
     }
     for (const i of v.items) {
       const clave = i.id || i.nombre;
-      if (!prods.has(clave)) prods.set(clave, { nombre: i.nombre, cantidad: 0, usd: 0, cup: 0 });
+      if (!prods.has(clave)) prods.set(clave, { id: i.id, nombre: i.nombre, cantidad: 0, usd: 0, cup: 0, costoCUP: 0 });
       const p = prods.get(clave);
       p.cantidad += i.cantidad;
       p.usd += i.usdUnit * i.cantidad;
       p.cup += i.cupUnit * i.cantidad;
+      // costo aproximado en CUP al valor del dólar de esa venta (el ticket guarda el costo por unidad en USD)
+      p.costoCUP += Math.round(((i.costoUnit || 0) * (v.tasaUSD || tasaUSD)) / 100) * i.cantidad;
     }
   }
 
@@ -212,6 +228,9 @@ export function textoReporteSMS({ resumen, ts = Date.now(), pendientes = 0, stoc
     `PUNTO 3 M ${fechaCorta(ts)}`,
     `Ventas: ${r.tickets} | ${fmtUSD(r.ventasUSD)} USD / ${r.ventasCUP} CUP`,
     `Caja: CUP ${r.caja.CUP} | USD ${fmtUSD(r.caja.USD)} | MLC ${fmtUSD(r.caja.MLC)}`,
+    ...(r.transf && (r.transf.CUP || r.transf.USD || r.transf.MLC)
+      ? [`Transf: CUP ${r.transf.CUP} | USD ${fmtUSD(r.transf.USD)} | MLC ${fmtUSD(r.transf.MLC)}`]
+      : []),
     `Neto: ${fmtUSD(r.netoUSD)} USD / ${r.netoCUP} CUP`,
   ];
   r.porCajero.slice(0, 5).forEach((c) => lineas.push(`${c.cajero}: ${c.tickets} v. ${c.ventasCUP} CUP`));
@@ -224,4 +243,19 @@ export function textoReporteSMS({ resumen, ts = Date.now(), pendientes = 0, stoc
 export function enlaceSMS(telefono, texto) {
   const numero = String(telefono || '').replace(/[^\d+]/g, '');
   return `sms:${numero}?body=${encodeURIComponent(texto)}`;
+}
+
+// ------------------------------------------------------------------ rendimiento por producto
+
+/**
+ * Ganancia por producto a partir de lo que devuelve reportePeriodo().productos.
+ * Ordena por ganancia (la mayor primero). margen = ganancia / ventas, en %.
+ */
+export function rendimientoProductos(productos) {
+  return productos
+    .map((p) => {
+      const ganancia = p.cup - (p.costoCUP || 0);
+      return { ...p, gananciaCUP: ganancia, margen: p.cup > 0 ? Math.round((ganancia / p.cup) * 100) : 0 };
+    })
+    .sort((a, b) => b.gananciaCUP - a.gananciaCUP);
 }

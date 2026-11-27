@@ -536,6 +536,7 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.dataset && e.target.dataset.input === 'arqueo') calcularTotalArqueo();
+  if (e.target.dataset && e.target.dataset.input === 'cobro') calcularVueltoEnVivo();
 });
 
 document.addEventListener('change', (e) => {
@@ -559,6 +560,8 @@ $('input-buscador-predictivo').addEventListener('keydown', teclaBuscador);
 $('input-codigo-barras').addEventListener('keydown', teclaCodigoBarras);
 $('input-efectivo-recibido').addEventListener('input', calcularVueltoEnVivo);
 $('input-efectivo-recibido').addEventListener('keydown', teclaCobro);
+$('input-transferencia').addEventListener('input', calcularVueltoEnVivo);
+$('input-transferencia').addEventListener('keydown', teclaCobro);
 $('input-buscador-inventario').addEventListener('input', renderInventario);
 $('buscar-mercancia').addEventListener('input', () => { renderMercancia(); etiquetarTablas(); });
 $('orden-mercancia').addEventListener('change', () => { renderMercancia(); etiquetarTablas(); });

@@ -241,6 +241,23 @@
                     <h3 class="text-sm font-bold mb-3">👤 Ventas por cajero</h3>
                     <div id="desglose-cajeros" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
                 </div>
+
+                <details id="sec-rendimiento" class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border dark:border-slate-700 group">
+                    <summary class="cursor-pointer select-none list-none flex justify-between items-center p-3.5 font-bold text-sm">📈 Ganancia por producto y más vendidos<span class="text-slate-400 text-xs group-open:rotate-180 transition">▼</span></summary>
+                    <div class="px-3 pb-3 space-y-3">
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <select id="rend-rango" class="border dark:border-slate-700 dark:bg-slate-900 rounded-lg px-3 py-2.5 text-sm">
+                                <option value="turno">Turno actual</option>
+                                <option value="ultimos7">Últimos 7 días</option>
+                                <option value="semana">Esta semana (lunes a hoy)</option>
+                                <option value="pasada">Semana pasada</option>
+                                <option value="ultimos30">Últimos 30 días</option>
+                            </select>
+                            <button type="button" data-action="generar-rendimiento" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-3 rounded-lg font-bold shadow">Ver</button>
+                        </div>
+                        <div id="rend-resultado"><p class="text-sm text-slate-400 italic">Elige el periodo y toca "Ver".</p></div>
+                    </div>
+                </details>
             </div>
 
             <!-- ============ 2. PRODUCTOS ============ -->
@@ -556,6 +573,7 @@
                     <div class="flex justify-between"><span>Total contado:</span><strong id="arqueo-total-contado">0 CUP</strong></div>
                     <div class="flex justify-between"><span>Diferencia:</span><span id="arqueo-diferencia" class="font-extrabold">Cuadra ✅</span></div>
                     <p id="arqueo-otros" class="text-[11px] text-slate-500"></p>
+                    <p id="arqueo-transf" class="text-[11px] text-sky-700 dark:text-sky-300"></p>
                 </div>
             </div>
 
@@ -580,6 +598,7 @@
                 <div class="fila"><span>USD:</span><span id="rz-usd"></span></div>
                 <div class="fila"><span>MLC:</span><span id="rz-mlc"></span></div>
                 <div class="fila"><span>CUP:</span><span id="rz-cup"></span></div>
+                <div class="fila" id="rz-fila-transf"><span>Por transferencia:</span><span id="rz-transf"></span></div>
                 <div class="linea"></div>
                 <div class="fila"><span>Tickets:</span><span id="rz-tickets"></span></div>
                 <div class="fila"><span>Ventas:</span><span id="rz-ventas"></span></div>
@@ -637,7 +656,16 @@
                 <p class="text-xs text-slate-500">Total a pagar:</p>
                 <p class="text-2xl font-extrabold" id="cobro-total-pagar">0 CUP</p>
             </div>
-            <input type="number" step="0.01" min="0" id="input-efectivo-recibido" class="w-full border-2 border-indigo-300 dark:border-indigo-800 dark:bg-slate-900 rounded-lg p-3 text-xl font-bold text-center" placeholder="Pago exacto" inputmode="decimal">
+            <div class="rounded-lg border dark:border-slate-700 p-3 space-y-2">
+                <p class="text-xs font-bold text-sky-700 dark:text-sky-300">🏦 Parte pagada por transferencia (opcional)</p>
+                <div class="flex gap-2">
+                    <input type="number" step="0.01" min="0" id="input-transferencia" data-input="cobro" class="flex-1 min-w-0 border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2.5 text-base font-bold text-center" placeholder="0" inputmode="decimal">
+                    <button type="button" data-action="todo-transferencia" class="bg-sky-600 text-white text-xs px-3 rounded-lg font-bold">Todo</button>
+                </div>
+                <input type="text" maxlength="40" id="input-referencia" class="w-full border dark:border-slate-700 dark:bg-slate-900 rounded-lg p-2 text-xs" placeholder="Referencia / # de transferencia (opcional)">
+            </div>
+            <p class="text-xs text-slate-500 text-center" id="cobro-efectivo-texto">Efectivo a recibir:</p>
+            <input type="number" step="0.01" min="0" id="input-efectivo-recibido" data-input="cobro" class="w-full border-2 border-indigo-300 dark:border-indigo-800 dark:bg-slate-900 rounded-lg p-3 text-xl font-bold text-center" placeholder="Efectivo (vacío = exacto)" inputmode="decimal">
             <p id="cobro-error" class="hidden text-xs text-red-600 font-bold text-center"></p>
             <div class="bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-lg border dark:border-slate-700 text-center">
                 <p class="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Vuelto / Cambio:</p>
@@ -662,7 +690,8 @@
                 <div id="ticket-lista-items"></div>
                 <div class="linea"></div>
                 <div class="fila negrita"><span>TOTAL:</span><span id="ticket-total"></span></div>
-                <div class="fila"><span>Recibido:</span><span id="ticket-recibido"></span></div>
+                <div class="fila" id="fila-ticket-transf"><span>Transferencia:</span><span id="ticket-transf"></span></div>
+                <div class="fila"><span>Efectivo recibido:</span><span id="ticket-recibido"></span></div>
                 <div class="fila negrita"><span>Vuelto:</span><span id="ticket-vuelto"></span></div>
                 <div class="linea"></div>
                 <div class="centro">¡Gracias por su compra!</div>

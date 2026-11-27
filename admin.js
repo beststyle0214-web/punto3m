@@ -8,7 +8,7 @@ import {
 } from './utils.js';
 import { aMinor, fmtMinor, fmtUSD, precioPrincipal, costoPrincipal } from './money.js';
 import {
-  resumenTurno, cuadreInventario, rangoReporte, reportePeriodo, enlaceSMS,
+  resumenTurno, cuadreInventario, rangoReporte, reportePeriodo, rendimientoProductos, enlaceSMS,
 } from './calculos.js';
 import { planDesdeAntiguo, planDesdeRespaldo } from './migracion.js';
 import { LADO_FOTO } from './config.js';
@@ -198,7 +198,7 @@ export function renderHistorial() {
           (v) => `<tr><td class="p-3 text-xs">${formatoHora(v.ts)}</td>
             <td class="p-3 font-semibold text-indigo-600 dark:text-indigo-400">${esc(v.cajero)}</td>
             <td class="p-3">${esc(v.items.map((i) => `${i.cantidad}x ${i.nombre}`).join(', '))}</td>
-            <td class="p-3 whitespace-nowrap">${esc(fmtMinor(v.cobrado, v.moneda))}</td>
+            <td class="p-3 whitespace-nowrap">${esc(fmtMinor(v.cobrado, v.moneda))}${v.transferencia ? `<span class="block text-[10px] text-sky-600 dark:text-sky-400 font-semibold">🏦 ${esc(fmtMinor(v.transferencia, v.moneda))}${v.referencia ? ` · ${esc(v.referencia)}` : ''}</span>` : ''}</td>
             <td class="p-3 whitespace-nowrap">${fmtUSD(v.totalUSD)}${Number.isFinite(v.totalCUP) ? ` / ${v.totalCUP} CUP` : ''}</td>
             <td class="p-3 text-right"><button type="button" data-action="ver-ticket" data-id="${esc(v.id)}" class="px-2 py-1" aria-label="Ver ticket">🧾</button></td></tr>`,
         )
@@ -214,7 +214,10 @@ export function renderFinanciero() {
   $('gastos-dia-cup').textContent = cup(r.gastosCUP);
   $('ganancia-neta-dia').textContent = `${fmtUSD(r.netoUSD)} USD`;
   $('ganancia-neta-dia-cup').textContent = cup(r.netoCUP);
-  $('caja-turno').textContent = `CUP ${r.caja.CUP} · ${fmtMinor(r.caja.USD, 'USD')} · ${fmtMinor(r.caja.MLC, 'MLC')}`;
+  const hayTransf = r.transf.CUP || r.transf.USD || r.transf.MLC;
+  $('caja-turno').textContent =
+    `CUP ${r.caja.CUP} · ${fmtMinor(r.caja.USD, 'USD')} · ${fmtMinor(r.caja.MLC, 'MLC')}` +
+    (hayTransf ? `  |  🏦 Transferencias: CUP ${r.transf.CUP} · ${fmtMinor(r.transf.USD, 'USD')} · ${fmtMinor(r.transf.MLC, 'MLC')}` : '');
 
   $('desglose-categorias-grid').innerHTML = r.porCategoria
     .map(
@@ -723,6 +726,9 @@ export function abrirReporteZ() {
   $('rz-usd').textContent = fmtMinor(r.caja.USD, 'USD');
   $('rz-mlc').textContent = fmtMinor(r.caja.MLC, 'MLC');
   $('rz-cup').textContent = fmtMinor(r.caja.CUP, 'CUP');
+  const hayTr = r.transf.CUP || r.transf.USD || r.transf.MLC;
+  $('rz-fila-transf').classList.toggle('hidden', !hayTr);
+  $('rz-transf').textContent = `${r.transf.CUP} CUP · ${fmtMinor(r.transf.USD, 'USD')} · ${fmtMinor(r.transf.MLC, 'MLC')}`;
   $('rz-tickets').textContent = String(r.tickets);
   $('rz-ventas').textContent = `${fmtUSD(r.ventasUSD)} / ${r.ventasCUP} CUP`;
   $('rz-gastos').textContent = `-${fmtUSD(r.gastosUSD)} / -${r.gastosCUP} CUP`;
@@ -782,6 +788,7 @@ async function cerrarTurno() {
     netoUSD: r.netoUSD,
     netoCUP: r.netoCUP,
     caja: r.caja,
+    transf: r.transf,
     porCategoria: r.porCategoria,
     porCajero: r.porCajero,
     arqueos: estado.cortes.map((c) => ({
@@ -809,6 +816,9 @@ function verCierre(id) {
     fila('USD:', fmtMinor(caja.USD || 0, 'USD')),
     fila('MLC:', fmtMinor(caja.MLC || 0, 'MLC')),
     fila('CUP:', fmtMinor(caja.CUP || 0, 'CUP')),
+    ...(c.transf && (c.transf.CUP || c.transf.USD || c.transf.MLC)
+      ? [fila('Por transferencia:', `${c.transf.CUP || 0} CUP · ${fmtMinor(c.transf.USD || 0, 'USD')} · ${fmtMinor(c.transf.MLC || 0, 'MLC')}`)]
+      : []),
     `<div class="linea"></div>`,
     fila('Tickets:', String(c.tickets)),
     fila('Ventas:', `${fmtUSD(c.ventasUSD)}${Number.isFinite(c.ventasCUP) ? ` / ${c.ventasCUP} CUP` : ''}`),
@@ -996,6 +1006,86 @@ async function importarDatosAntiguos() {
 
 // ------------------------------------------------------------- acciones
 
+// ------------------------------------------------------------- ganancia por producto / más vendidos
+
+async function generarRendimiento() {
+  if (!exigirDueno()) return;
+  const modo = $('rend-rango').value;
+  const caja = $('rend-resultado');
+  caja.innerHTML = '<p class="text-sm text-slate-400 italic">Calculando…</p>';
+  try {
+    let rep;
+    let deCache = false;
+    if (modo === 'turno') {
+      const desde = (estado.turno && estado.turno.inicio) || 0;
+      rep = reportePeriodo({ ventas: estado.ventas, mermas: estado.mermas, desde: desde || Date.now() - 86400000, hasta: Date.now(), tasaUSD: estado.tasaUSD });
+    } else {
+      const { desde, hasta } = rangoReporte(modo);
+      const [ventas, mermas] = await Promise.all([datos.ventasDesde(desde), datos.mermasDesde(desde)]);
+      deCache = ventas.deCache;
+      rep = reportePeriodo({ ventas: ventas.lista, mermas, desde, hasta, tasaUSD: estado.tasaUSD });
+    }
+    dibujarRendimiento(rep, deCache);
+  } catch (e) {
+    caja.innerHTML = '<p class="text-sm text-red-600">No se pudo calcular. Revisa tu conexión e inténtalo otra vez.</p>';
+    mostrarFallo(e, 'Reporte de ganancia');
+  }
+}
+
+function dibujarRendimiento(rep, deCache) {
+  const filas = rendimientoProductos(rep.productos);
+  const masVendidos = [...rep.productos].sort((a, b) => b.cantidad - a.cantidad).slice(0, 5);
+  const vendidos = new Set(rep.productos.map((p) => p.id || p.nombre));
+  const sinVentas = estado.productos.filter((p) => !vendidos.has(p.id)).map(nombreProducto).sort((a, b) => a.localeCompare(b, 'es'));
+  const maxDia = Math.max(1, ...rep.dias.map((d) => d.ventasCUP));
+  const grafico =
+    rep.dias.length > 1
+      ? `<h4 class="text-sm font-bold mb-1">Ventas por día (CUP)</h4>
+        <div class="flex items-end gap-1 h-28 mb-4" role="img" aria-label="Ventas por día">
+          ${rep.dias
+            .map((d) => {
+              const alto = Math.max(d.ventasCUP ? 4 : 1, Math.round((d.ventasCUP / maxDia) * 100));
+              return `<div class="flex-1 min-w-0 flex flex-col items-center justify-end h-full" title="${esc(fechaDia(d.ms))}: ${d.ventasCUP} CUP">
+                <span class="text-[9px] text-slate-500 mb-0.5">${d.ventasCUP || ''}</span>
+                <div class="w-full bg-indigo-500 dark:bg-indigo-400 rounded-t" style="height:${alto}%"></div>
+                <span class="text-[9px] text-slate-500 mt-0.5 capitalize">${esc(fechaDia(d.ms).slice(0, 3))}</span></div>`;
+            })
+            .join('')}
+        </div>`
+      : '';
+  $('rend-resultado').innerHTML = `
+    ${deCache ? '<p class="text-xs text-amber-700 dark:text-amber-300 font-semibold mb-2">⚠️ Sin internet: solo lo guardado en este teléfono.</p>' : ''}
+    <div class="grid grid-cols-3 gap-2 text-center mb-4">
+      <div class="bg-indigo-50 dark:bg-indigo-950/40 rounded-xl p-2.5 border dark:border-slate-700"><p class="text-[11px]">Ventas</p><p class="text-base font-extrabold">${rep.ventasCUP} CUP</p></div>
+      <div class="bg-amber-50 dark:bg-amber-950/40 rounded-xl p-2.5 border dark:border-slate-700"><p class="text-[11px]">Costo</p><p class="text-base font-extrabold">${rep.costoCUP} CUP</p></div>
+      <div class="bg-emerald-50 dark:bg-emerald-950/40 rounded-xl p-2.5 border dark:border-slate-700"><p class="text-[11px]">Ganancia</p><p class="text-base font-extrabold">${rep.ventasCUP - rep.costoCUP} CUP</p></div>
+    </div>
+    ${grafico}
+    <h4 class="text-sm font-bold mb-1">🏆 Más vendidos</h4>
+    <ol class="text-sm mb-4 space-y-1">${
+      masVendidos.length
+        ? masVendidos.map((p, i) => `<li>${i + 1}. <b>${esc(p.nombre)}</b> — ${p.cantidad} un.</li>`).join('')
+        : '<li class="text-slate-400 italic">Sin ventas en este periodo.</li>'
+    }</ol>
+    <h4 class="text-sm font-bold mb-1">💰 Ganancia por producto <span class="font-normal text-slate-400">(aproximada)</span></h4>
+    <div class="overflow-x-auto mb-4"><table class="tabla-movil w-full text-left text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900 border-b dark:border-slate-700"><tr><th class="p-2">Producto</th><th class="p-2">Vendidos</th><th class="p-2">Ventas</th><th class="p-2">Ganancia</th><th class="p-2">Margen</th></tr></thead>
+      <tbody class="divide-y dark:divide-slate-700">${
+        filas.length
+          ? filas
+              .slice(0, 25)
+              .map(
+                (p) => `<tr><td class="p-2 font-semibold">${esc(p.nombre)}</td><td class="p-2">${p.cantidad}</td><td class="p-2">${p.cup} CUP</td>
+                  <td class="p-2 font-bold ${p.gananciaCUP < 0 ? 'text-red-600' : 'text-emerald-600 dark:text-emerald-400'}">${p.gananciaCUP} CUP</td><td class="p-2">${p.margen}%</td></tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="5" class="p-2 text-slate-400 italic">Sin ventas en este periodo.</td></tr>'
+      }</tbody></table></div>
+    <h4 class="text-sm font-bold mb-1">😴 Sin ventas en este periodo</h4>
+    <p class="text-xs text-slate-600 dark:text-slate-300">${sinVentas.length ? esc(sinVentas.slice(0, 30).join(' · ')) + (sinVentas.length > 30 ? ` … (+${sinVentas.length - 30})` : '') : 'Todos los productos tuvieron ventas. 👏'}</p>`;
+  etiquetarTablas();
+}
+
 export const accionesAdmin = {
   'agregar-categoria': agregarCategoria,
   'eliminar-categoria': (d) => eliminarCategoria(d.cat),
@@ -1038,6 +1128,7 @@ export const accionesAdmin = {
   'reiniciar-turno': cerrarTurno,
   'ver-cierre': (d) => verCierre(d.id),
   'generar-semana': generarReporteSemana,
+  'generar-rendimiento': generarRendimiento,
   'copiar-semana': copiarReporteSemana,
   'sms-semana': smsReporteSemana,
   'csv-semana': csvReporteSemana,

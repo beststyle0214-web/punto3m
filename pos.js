@@ -372,31 +372,61 @@ function iniciarCobro(moneda) {
   entrada.value = '';
   entrada.step = moneda === 'CUP' ? '1' : '0.01';
   $('cobro-vuelto-texto').textContent = fmtMinor(0, moneda);
+  $('input-transferencia').value = '';
+  $('input-transferencia').step = moneda === 'CUP' ? '1' : '0.01';
+  $('input-referencia').value = '';
+  $('cobro-efectivo-texto').textContent = `Efectivo a recibir: ${fmtMinor(monto, moneda)}`;
   $('cobro-error').classList.add('hidden');
   abrirModal('modal-cobro');
   setTimeout(() => entrada.focus(), 30);
 }
 
+/** Lo pagado por transferencia (en unidades menores). NaN = valor no válido. */
+function leerTransferencia() {
+  const txt = $('input-transferencia').value.trim();
+  if (txt === '') return 0;
+  const t = aMinor(txt, cobro.moneda);
+  if (!Number.isFinite(t) || t < 0 || t > cobro.monto) return NaN;
+  return t;
+}
+
+/** Botón "Todo": todo el total por transferencia. */
+export function todoPorTransferencia() {
+  if (!cobro) return;
+  $('input-transferencia').value = cobro.moneda === 'CUP' ? String(cobro.monto) : (cobro.monto / 100).toFixed(2);
+  $('input-efectivo-recibido').value = '';
+  calcularVueltoEnVivo();
+}
+
 export function calcularVueltoEnVivo() {
   if (!cobro) return;
-  const txt = $('input-efectivo-recibido').value.trim();
   const error = $('cobro-error');
+  const transf = leerTransferencia();
+  if (Number.isNaN(transf)) {
+    error.textContent = 'La transferencia no es válida (no puede pasar del total).';
+    error.classList.remove('hidden');
+    $('cobro-vuelto-texto').textContent = fmtMinor(0, cobro.moneda);
+    return;
+  }
+  const efectivo = cobro.monto - transf;
+  $('cobro-efectivo-texto').textContent = `Efectivo a recibir: ${fmtMinor(efectivo, cobro.moneda)}`;
+  const txt = $('input-efectivo-recibido').value.trim();
   if (txt === '') {
     error.classList.add('hidden');
     $('cobro-vuelto-texto').textContent = fmtMinor(0, cobro.moneda);
     return;
   }
   const recibido = aMinor(txt, cobro.moneda);
-  if (!Number.isFinite(recibido) || recibido < cobro.monto) {
+  if (!Number.isFinite(recibido) || recibido < efectivo) {
     error.textContent = Number.isFinite(recibido)
-      ? `Faltan ${fmtMinor(cobro.monto - recibido, cobro.moneda)}`
+      ? `Faltan ${fmtMinor(efectivo - recibido, cobro.moneda)}`
       : 'Monto no válido';
     error.classList.remove('hidden');
     $('cobro-vuelto-texto').textContent = fmtMinor(0, cobro.moneda);
     return;
   }
   error.classList.add('hidden');
-  $('cobro-vuelto-texto').textContent = fmtMinor(recibido - cobro.monto, cobro.moneda);
+  $('cobro-vuelto-texto').textContent = fmtMinor(recibido - efectivo, cobro.moneda);
 }
 
 export function teclaCobro(e) {
@@ -423,9 +453,12 @@ function confirmarVenta() {
 
   const t = totalesCarrito(lineas, tasas());
   const monto = montoACobrar(t, cobro.moneda);
+  const transf = leerTransferencia();
+  if (Number.isNaN(transf)) return calcularVueltoEnVivo();
+  const efectivo = monto - transf;
   const txt = $('input-efectivo-recibido').value.trim();
-  const recibido = txt === '' ? monto : aMinor(txt, cobro.moneda);
-  if (!Number.isFinite(recibido) || recibido < monto) return calcularVueltoEnVivo(); // no deja cobrar de menos
+  const recibido = txt === '' ? efectivo : aMinor(txt, cobro.moneda);
+  if (!Number.isFinite(recibido) || recibido < efectivo) return calcularVueltoEnVivo(); // no deja cobrar de menos
 
   const venta = {
     turnoId: estado.turno.id,
@@ -434,8 +467,10 @@ function confirmarVenta() {
     cajero: cajero.nombre,
     moneda: cobro.moneda,
     cobrado: monto,
-    recibido,
-    vuelto: recibido - monto,
+    recibido, // efectivo que entregó el cliente
+    vuelto: recibido - efectivo,
+    transferencia: transf,
+    ...(transf > 0 && $('input-referencia').value.trim() ? { referencia: $('input-referencia').value.trim().slice(0, 40) } : {}),
     totalUSD: t.usd,
     totalCUP: t.cup,
     costoCents: t.costo,
@@ -474,6 +509,9 @@ export function mostrarTicket(v) {
     .map((i) => `<div>${i.cantidad}x ${esc(i.nombre)}</div>`)
     .join('');
   $('ticket-total').textContent = fmtMinor(v.cobrado, v.moneda);
+  const tr = v.transferencia || 0;
+  $('fila-ticket-transf').classList.toggle('hidden', !tr);
+  $('ticket-transf').textContent = fmtMinor(tr, v.moneda);
   $('ticket-recibido').textContent = fmtMinor(v.recibido, v.moneda);
   $('ticket-vuelto').textContent = fmtMinor(v.vuelto, v.moneda);
   abrirModal('modal-ticket');
@@ -492,6 +530,7 @@ async function copiarTicket() {
     formatoFechaHora(v.ts),
     ...v.items.map((i) => `${i.cantidad}x ${i.nombre}`),
     `Total: ${fmtMinor(v.cobrado, v.moneda)}`,
+    ...(v.transferencia ? [`Transferencia: ${fmtMinor(v.transferencia, v.moneda)}${v.referencia ? ` (ref. ${v.referencia})` : ''}`] : []),
     `Vuelto: ${fmtMinor(v.vuelto, v.moneda)}`,
   ].join('\n');
   try {
@@ -562,6 +601,11 @@ export function calcularTotalArqueo() {
     esperado.caja.USD || esperado.caja.MLC
       ? `También debe haber ${fmtMinor(esperado.caja.USD, 'USD')} y ${fmtMinor(esperado.caja.MLC, 'MLC')} (cuéntalos aparte).`
       : '';
+  const tr = esperado.transf;
+  $('arqueo-transf').textContent =
+    tr.CUP || tr.USD || tr.MLC
+      ? `🏦 Cobrado por transferencia en tus ventas (NO va en la gaveta): ${[tr.CUP && `${tr.CUP} CUP`, tr.USD && fmtMinor(tr.USD, 'USD'), tr.MLC && fmtMinor(tr.MLC, 'MLC')].filter(Boolean).join(' + ')}`
+      : '';
   $('arqueo-total-contado').textContent = `${total} CUP`;
   const el = $('arqueo-diferencia');
   el.textContent = dif === 0 ? 'Cuadra ✅' : `${dif > 0 ? 'Sobra' : 'Falta'} ${Math.abs(dif)} CUP`;
@@ -599,6 +643,7 @@ async function cerrarArqueo() {
     hasta,
     tickets: esperado.tickets,
     esperado: esperado.caja,
+    transferencias: esperado.transf,
     fondoCUP: fondo,
     contadoCUP: total,
     diferenciaCUP: dif,
@@ -656,6 +701,7 @@ export const accionesPOS = {
   'abrir-escaner': abrirEscanerVentas,
   'ver-carrito': () => $('seccion-carrito').scrollIntoView({ behavior: 'smooth', block: 'start' }),
   cobrar: (d) => iniciarCobro(d.moneda),
+  'todo-transferencia': todoPorTransferencia,
   'confirmar-venta': confirmarVenta,
   'abrir-cajeros': abrirSeleccionCajero,
   'cambiar-pin': cambiarPinPropio,
