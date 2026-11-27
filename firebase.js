@@ -41,6 +41,6 @@ try {
 
 // Caché local: la app abre y puede vender aunque se caiga el internet;
 // las escrituras quedan en cola y se envían al reconectar.
-db.enablePersistence({ synchronizeTabs: true }).catch((e) => {
+db.enablePersistence({ synchronizeTabs: false }).catch((e) => {
   console.warn('Modo offline no disponible en este navegador:', e.code);
 });

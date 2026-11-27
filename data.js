@@ -16,10 +16,10 @@
 // El stock se cambia con FieldValue.increment(): dos cajas vendiendo a la vez
 // no se pisan (antes ganaba la última en guardar el inventario completo).
 
-import { db, FieldValue } from './firebase.js';
+import { db, auth, FieldValue } from './firebase.js';
 import { estado } from './estado.js';
 import { aMillis, fotoValida, conTiempo } from './utils.js';
-import { CATEGORIAS_POR_DEFECTO, TASAS_POR_DEFECTO, DIAS_CIERRES } from './config.js';
+import { CATEGORIAS_POR_DEFECTO, TASAS_POR_DEFECTO, DIAS_CIERRES, PROXY_URL, firebaseConfig } from './config.js';
 import { costoUnitUSD, costoUnitCUP } from './money.js';
 
 const col = (nombre) => db.collection(nombre);
@@ -404,12 +404,35 @@ export function eliminarEmpleado(id) {
 /** Prueba si el teléfono habla con el servidor ahora mismo (sin usar la copia guardada). */
 export async function probarServidor() {
   const t = Date.now();
+  const proxy = (PROXY_URL || '').trim().replace(/\/+$/, '');
+  const info = { proxy: proxy || '(vacío: no hay intermediario)' };
+  // 1) Reinicia la conexión (por si quedó en una espera larga después de fallar)
+  try {
+    await db.disableNetwork();
+    await db.enableNetwork();
+  } catch (e) {
+    info.reinicio = e.code || e.name;
+  }
+  // 2) Prueba con una petición normal al servidor, con tu sesión (sin usar el canal en vivo)
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const r = await conTiempo(
+      fetch(`${proxy}/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config/general`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      12000,
+    );
+    info.peticion = r.status;
+  } catch (e) {
+    info.peticion = `falló (${e.code || e.name})`;
+  }
+  // 3) Prueba con el canal en vivo del SDK (el que usa la app para sincronizar)
   try {
     await conTiempo(col('config').doc('general').get({ source: 'server' }), 12000);
-    return { ok: true, ms: Date.now() - t };
+    return { ok: true, ms: Date.now() - t, info };
   } catch (e) {
     // "permission-denied" también prueba que se llegó al servidor
-    return { ok: !!e && e.code === 'permission-denied', ms: Date.now() - t, codigo: (e && (e.code || e.name)) || 'desconocido', mensaje: (e && e.message) || '' };
+    return { ok: !!e && e.code === 'permission-denied', ms: Date.now() - t, codigo: (e && (e.code || e.name)) || 'desconocido', mensaje: (e && e.message) || '', info };
   }
 }
 

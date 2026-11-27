@@ -507,11 +507,12 @@ const acciones = {
   imprimir: () => window.print(),
   'modo-oscuro': alternarModoOscuro,
   'probar-sync': async () => {
-    toast('Probando conexión con el servidor…', 'info');
+    toast('Probando conexión con el servidor… (hasta 25 s)', 'info');
     const r = await datos.probarServidor();
-    const pend = estado.pendientes ? `\n\nVentas guardadas solo en este teléfono: ${estado.pendientes}. Se enviarán solas cuando haya conexión.` : '';
-    if (r.ok) avisar(`✅ Hay conexión con el servidor (${r.ms} ms).${pend}`, 'Sincronización');
-    else avisar(`❌ No hay conexión con el servidor.\nCódigo: ${r.codigo}\n${String(r.mensaje).slice(0, 140)}${pend}\n\nSi es la primera vez: borra los datos del sitio en Chrome y vuelve a entrar.`, 'Sincronización');
+    const pend = estado.pendientes ? `\nVentas guardadas solo en este teléfono: ${estado.pendientes}. Se enviarán solas cuando haya conexión.` : '';
+    const detalle = `\n\nIntermediario: ${r.info.proxy}\nPetición normal: ${r.info.peticion}`;
+    if (r.ok) avisar(`✅ Hay conexión con el servidor (${r.ms} ms).${detalle}${pend}`, 'Sincronización');
+    else avisar(`❌ El canal en vivo no conecta.\nCódigo: ${r.codigo}${detalle}${pend}`, 'Sincronización');
   },
   'abrir-menu': abrirMenu,
   'cerrar-menu': cerrarMenu,
